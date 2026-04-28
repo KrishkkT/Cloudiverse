@@ -1,0 +1,50 @@
+{
+  "name": "multi-cloud-ai-planner",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "homepage": ".",
+  "scripts": {
+    "dev": "npx vite",
+    "build": "npx vite build",
+    "lint": "npx eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "npx vite preview"
+  },
+  "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
+    "@formspree/react": "^3.0.0",
+    "@neondatabase/neon-js": "^0.1.0-beta.19",
+    "@react-oauth/google": "^0.13.4",
+    "axios": "^1.6.7",
+    "dagre": "^0.8.5",
+    "file-saver": "^2.0.5",
+    "framer-motion": "^12.29.0",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.50.1",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^6.22.0",
+    "react-syntax-highlighter": "^15.5.0",
+    "react-toastify": "^10.0.4",
+    "reactflow": "^11.11.4",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.56",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.1.4"
+  }
+}
