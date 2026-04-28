@@ -1,0 +1,724 @@
+/**
+ * usageNormalizer.js
+ * 
+ * Explicit mapping between high-level usage profiles and resource-specific Infracost usage keys.
+ * 
+ * CRITICAL PRINCIPLE:
+ * Usage normalization must adapt to which services are ACTUALLY DEPLOYED,
+ * not blindly assume all services exist.
+ */
+
+const { getServiceDefinition } = require('../../catalog/terraform/utils');
+const yaml = require('js-yaml');
+const { resolveServiceId } = require('../../config/aliases');
+
+/**
+ * Normalize usage profile into Infracost-compatible resource usage.
+ * 
+ * @param {Object} usage_profile - High-level usage (monthly_users, requests_per_user, etc.)
+ * @param {Array<string>} deployableServices - List of service_class names that are being deployed
+ * @param {string} provider - Cloud provider (AWS, GCP, AZURE)
+ * @returns {Object} - Infracost usage file structure
+ */
+function normalizeUsageForInfracost(usage_profile, deployableServices, provider) {
+    if (!usage_profile) {
+        console.warn('[USAGE NORMALIZER] No usage profile provided, using defaults');
+        usage_profile = {
+            monthly_users: 5000,
+            requests_per_user: 30,
+            data_transfer_gb: 50,
+            data_storage_gb: 20,
+            peak_concurrency: 100
+        };
+    }
+
+    const usage = {};
+
+    // Calculate derived metrics
+    const monthlyRequests = (usage_profile.monthly_users || 5000) *
+        (usage_profile.requests_per_user || 30);
+    const storageGB = usage_profile.data_storage_gb || 20;
+    const transferGB = usage_profile.data_transfer_gb || 50;
+
+    console.log(`[USAGE NORMALIZER] ${provider} - Normalizing for ${deployableServices.length} deployable services`);
+    console.log(`[USAGE NORMALIZER] Derived: ${monthlyRequests} requests/mo, ${storageGB}GB storage, ${transferGB}GB transfer`);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // COMPUTE SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    // 🔥 FIX: Normalize service names using the central resolver
+    const normalizedServices = deployableServices.map(s => {
+        let name = s;
+        if (typeof s === 'object') {
+            name = s.service_id || s.service || s.canonical_type || s.name || s.service_class;
+        }
+        return name ? resolveServiceId(name.toLowerCase()) : null;
+    }).filter(Boolean);
+
+    // Helper to check for service presence (handles both formats)
+    const hasService = (id) => {
+        const canonical = resolveServiceId(id.toLowerCase());
+        return normalizedServices.includes(canonical);
+    };
+
+    if (hasService('computeserverless')) {
+
+        switch (provider) {
+            case 'AWS':
+                usage['aws_lambda_function.app'] = {
+                    monthly_requests: monthlyRequests,
+                    request_duration_ms: 250 // Correct key is request_duration_ms
+                };
+                usage['aws_apigatewayv2_api.main'] = {
+                    monthly_requests: monthlyRequests
+                };
+                break;
+
+            case 'GCP':
+                usage['google_cloudfunctions_function.func'] = {
+                    monthly_requests: monthlyRequests,
+                    // GCP cloud functions v1/v2 use duration
+                    request_duration: 250
+                };
+                usage['google_cloud_run_service.app'] = {
+                    request_count: monthlyRequests
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_linux_function_app.func'] = {
+                    monthly_executions: monthlyRequests,
+                    average_duration_ms: 250
+                };
+                break;
+        }
+    }
+
+    if (hasService('computecontainer')) {
+        const instances = Math.max(2, Math.ceil((usage_profile.peak_concurrency || 100) / 50));
+
+        switch (provider) {
+            case 'AWS':
+                // 🔥 FIX: ECS Fargate uses task-level cpu/memory attributes in Terraform.
+                // Usage keys are mostly for uptime if not 24/7.
+                usage['aws_ecs_service.app'] = {
+                    monthly_hours: 730
+                };
+                break;
+
+            case 'GCP':
+                // 🔥 FIX: Cloud Run charging model often requires billed duration
+                // For REALTIME/Web platforms, we assume at least one instance is always warm (provisioned concurrency)
+                usage['google_cloud_run_service.app'] = {
+                    monthly_requests: monthlyRequests
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_app_service.app'] = {
+                    v_cpu_duration: monthlyRequests * 0.5 // rough estimate
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DATABASE SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('relationaldatabase')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_db_instance.db'] = {
+                    additional_backup_storage_gb: storageGB * 0.2, // Assume 20% extra backup
+                    monthly_standard_io_requests: monthlyRequests * 0.5
+                };
+                break;
+
+            case 'GCP':
+                usage['google_sql_database_instance.db'] = {
+                    storage_gb: storageGB
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_postgresql_flexible_server.db'] = {
+                    storage_gb: storageGB
+                };
+                break;
+        }
+    }
+
+    if (hasService('nosqldatabase')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_dynamodb_table.main'] = {
+                    monthly_write_request_units: monthlyRequests * 0.3,
+                    monthly_read_request_units: monthlyRequests * 0.7,
+                    storage_gb: storageGB
+                };
+                break;
+
+            case 'GCP':
+                usage['google_firestore_database.db'] = {
+                    monthly_document_writes: monthlyRequests * 0.3,
+                    monthly_document_reads: monthlyRequests * 0.7,
+                    storage_gb: storageGB
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_cosmosdb_account.db'] = {
+                    monthly_ru_per_second: Math.ceil(monthlyRequests / (30 * 24 * 3600))
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // STORAGE SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('objectstorage')) {
+        switch (provider) {
+            case 'AWS':
+                // Resource name must match terraformGeneratorV2: aws_s3_bucket.main
+                usage['aws_s3_bucket.main'] = {
+                };
+                break;
+
+            case 'GCP':
+                usage['google_storage_bucket.storage'] = {
+                    monthly_class_a_operations: monthlyRequests * 0.1,
+                    monthly_class_b_operations: monthlyRequests * 0.05
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_storage_account.storage'] = {
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // CACHE SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('cache')) {
+        // Cache typically runs 24/7, not usage-based
+        // Usage keys are minimal (mostly sizing-based in Terraform)
+        switch (provider) {
+            case 'AWS':
+                usage['aws_elasticache_cluster.c'] = {
+                    // ElastiCache is instance-based, not heavily usage-dependent
+                };
+                break;
+
+            case 'GCP':
+                usage['google_redis_instance.cache'] = {
+                    // Redis instance, mostly size-based
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_redis_cache.cache'] = {
+                    // Azure Cache, mostly tier-based
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // NETWORKING SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('loadbalancer')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_lb.alb'] = {
+                    new_connections: monthlyRequests,
+                    active_connections: Math.round(monthlyRequests / 30 / 24 / 60),
+                    processed_bytes: transferGB * 1024 * 1024 * 1024
+                };
+                break;
+
+            case 'GCP':
+                usage['google_compute_forwarding_rule.lb'] = {
+                    monthly_data_processed_gb: transferGB
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_application_gateway.gateway'] = {
+                    monthly_data_processed_gb: transferGB
+                };
+                break;
+        }
+    }
+
+    if (hasService('cdn')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_cloudfront_distribution.cdn'] = {
+                    monthly_data_transfer_to_internet_gb: {
+                        us_canada_europe: transferGB
+                    },
+                    monthly_http_requests: {
+                        us_canada_europe: monthlyRequests * 0.8
+                    },
+                    monthly_https_requests: {
+                        us_canada_europe: monthlyRequests * 0.2
+                    }
+                };
+                break;
+
+            case 'GCP':
+                usage['google_compute_backend_bucket.cdn'] = {
+                    monthly_egress_data_transfer_gb: {
+                        worldwide: transferGB
+                    }
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_cdn_endpoint.cdn'] = {
+                    zone_1_data_transfer_gb: transferGB
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MESSAGING SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('messagequeue')) {
+        const queueMessages = monthlyRequests * 0.2; // 20% async messages
+
+        switch (provider) {
+            case 'AWS':
+                usage['aws_sqs_queue.queue'] = {
+                    monthly_requests: queueMessages
+                };
+                break;
+
+            case 'GCP':
+                usage['google_pubsub_topic.topic'] = {
+                    monthly_message_data_gb: Math.ceil(queueMessages / 1000000) // 1KB avg message
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_servicebus_namespace.sb'] = {
+                    monthly_messages: queueMessages
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // IDENTITY & AUTH SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('identityauth')) {
+        const authRequests = monthlyRequests * 0.5; // 50% require auth
+
+        switch (provider) {
+            case 'AWS':
+                usage['aws_cognito_user_pool.auth'] = {
+                    monthly_active_users: usage_profile.monthly_users || 5000
+                };
+                break;
+
+            case 'GCP':
+                // Firebase Auth is usage-based but often free tier
+                usage['google_identity_platform_config.auth'] = {
+                    monthly_active_users: usage_profile.monthly_users || 5000
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_active_directory_b2c_directory.auth'] = {
+                    monthly_active_users: usage_profile.monthly_users || 5000
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // HIGH-AVAILABILITY / MULTI-REGION SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('globalloadbalancer')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_lb.global_alb'] = {
+                    new_connections: monthlyRequests,
+                    active_connections: Math.round(monthlyRequests / 30 / 24 / 60),
+                    processed_bytes: transferGB * 1024 * 1024 * 1024
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // API GATEWAY SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('apigateway')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_apigatewayv2_api.main'] = {
+                    monthly_requests: monthlyRequests
+                };
+                break;
+
+            case 'GCP':
+                usage['google_api_gateway_api.api'] = {
+                    monthly_requests: monthlyRequests
+                };
+                break;
+
+            case 'AZURE':
+                usage['azurerm_api_management.apim'] = {
+                    monthly_calls: monthlyRequests
+                };
+                break;
+        }
+    }
+
+    if (hasService('websocketgateway')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_apigatewayv2_api.websocket'] = {
+                    monthly_connection_minutes: monthlyRequests * 5, // 5 mins avg per connection
+                    monthly_messages: monthlyRequests * 10 // 10 messages per connection
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // MONITORING & LOGGING SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('monitoring')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_cloudwatch_metric_alarm.cpu'] = {
+                    metrics: 50 // number of custom metrics
+                };
+                break;
+        }
+    }
+
+    if (hasService('logging')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_cloudwatch_log_group.logs'] = {
+                    monthly_data_ingested_gb: Math.max(10, storageGB * 0.5)
+                };
+                break;
+        }
+    }
+
+    if (hasService('auditlogging')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_cloudwatch_log_group.audit'] = {
+                    monthly_data_ingested_gb: Math.max(5, storageGB * 0.2)
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SECRETS & SECURITY SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('secretsmanagement')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_secretsmanager_secret.secret'] = {
+                    monthly_api_calls: 10000 // typical secret retrieval
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // IOT SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('iotcore')) {
+        const deviceMessages = (usage_profile.device_count || 1000) * 30 * 24 * 60; // 1 msg/min
+        switch (provider) {
+            case 'AWS':
+                usage['aws_iot_topic_rule.telemetry'] = {
+                    monthly_messages: deviceMessages
+                };
+                break;
+        }
+    }
+
+    if (hasService('timeseriesdatabase')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_timestreamwrite_database.tsdb'] = {
+                    monthly_writes_gb: storageGB * 0.1
+                };
+                break;
+        }
+    }
+
+    if (hasService('eventstreaming')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_kinesis_stream.events'] = {
+                    monthly_shard_hours: 2 * 730 // 2 shards 24/7
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // EMERGING TECH & PLATFORM SERVICES (Service Mesh, Discovery, etc.)
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (hasService('servicediscovery')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_service_discovery_private_dns_namespace.dns'] = {
+                    monthly_hosted_zones: 1,
+                    monthly_queries: monthlyRequests * 2 // internal DNS lookups
+                };
+                break;
+            case 'GCP':
+                usage['google_service_directory_namespace.dns'] = {
+                    monthly_endpoints: 10,
+                    monthly_lookups: monthlyRequests
+                };
+                break;
+            case 'AZURE':
+                usage['azurerm_private_dns_zone.dns'] = {
+                    monthly_hosted_zones: 1
+                };
+                break;
+        }
+    }
+
+    if (hasService('servicemesh')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_appmesh_mesh.mesh'] = {
+                    monthly_mesh_hours: 730
+                };
+                break;
+            case 'GCP':
+                // Traffic Director (Google Cloud Service Mesh)
+                usage['google_compute_global_forwarding_rule.mesh'] = {
+                    monthly_traffic_gb: transferGB
+                };
+                break;
+        }
+    }
+
+    if (hasService('globalloadbalancer')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_globalaccelerator_accelerator.global'] = {
+                    monthly_fixed_fee_hours: 730,
+                    monthly_data_transfer_premium_gb: transferGB
+                };
+                break;
+            case 'GCP':
+                usage['google_compute_global_forwarding_rule.global_lb'] = {
+                    monthly_data_processing_gb: transferGB
+                };
+                break;
+            case 'AZURE':
+                usage['azurerm_traffic_manager_profile.global'] = {
+                    monthly_dns_queries: monthlyRequests
+                };
+                break;
+        }
+    }
+
+    if (hasService('searchengine')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_opensearch_domain.search'] = {
+                    storage_gb: storageGB,
+                    monthly_master_node_hours: 730,
+                    monthly_data_node_hours: 730
+                };
+                break;
+            case 'GCP':
+                // Vector Search or similar
+                usage['google_vertex_ai_index.vector'] = {
+                    monthly_node_hours: 730
+                };
+                break;
+            case 'AZURE':
+                usage['azurerm_search_service.search'] = {
+                    monthly_hours: 730, // Basic tier
+                    storage_gb: storageGB
+                };
+                break;
+        }
+    }
+
+    if (hasService('experimenttracking') || hasService('modelregistry') || hasService('mlpipelineorchestration')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_sagemaker_domain.studio'] = {
+                    monthly_studio_user_hours: 100 // estimated active hours
+                };
+                break;
+            case 'AZURE':
+                usage['azurerm_machine_learning_workspace.ml'] = {
+                    monthly_registry_storage_gb: storageGB
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ML / AI SERVICES (UPDATED)
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ... (Existing logic for mlinference maintained below)
+
+    if (hasService('mlinference') ||
+        hasService('ml_inference_gpu') ||
+        hasService('ml_inference_service')) {
+
+        // Calculate ML inference usage from user inputs
+        const mlInferences = monthlyRequests * 0.5; // Assume 50% of requests are ML inferences
+
+        switch (provider) {
+            case 'AWS':
+                usage['aws_sagemaker_endpoint.inference'] = {
+                    monthly_inference_instances: 1,
+                    monthly_inference_hours: 730, // 24/7
+                    monthly_inference_requests: mlInferences
+                };
+                break;
+            case 'GCP':
+                usage['google_vertex_ai_endpoint.inference'] = {
+                    monthly_prediction_requests: mlInferences
+                };
+                break;
+            case 'AZURE':
+                usage['azurerm_machine_learning_inference_cluster.inference'] = {
+                    monthly_inference_hours: 730
+                };
+                break;
+        }
+    }
+
+    if (deployableServices.includes('vector_database')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_opensearch_domain.vectors'] = {
+                    storage_gb: storageGB,
+                    monthly_index_requests: monthlyRequests * 0.1
+                };
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // DATA / STORAGE SERVICES
+    // ═══════════════════════════════════════════════════════════════════
+
+    if (deployableServices.includes('data_lake')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_s3_bucket.data_lake'] = {
+                    storage_gb: storageGB * 10, // data lakes are large
+                    monthly_tier_1_requests: monthlyRequests * 0.05
+                };
+                break;
+        }
+    }
+
+    if (deployableServices.includes('app_compute')) {
+        switch (provider) {
+            case 'AWS':
+                usage['aws_ecs_service.app'] = {
+                    monthly_cpu_hours: 2 * 730, // 2 instances 24/7
+                    monthly_memory_gb_hours: 4 * 730 // 2GB each
+                };
+                break;
+        }
+    }
+
+    console.log(`[USAGE NORMALIZER] Generated ${Object.keys(usage).length} resource usage entries`);
+
+    return usage;
+}
+
+/**
+ * Convert normalized usage object to Infracost YAML format.
+ * 🔥 FIX: Using resource_usage instead of usage, and ensuring version is a number.
+ */
+function toInfracostYAML(normalizedUsage) {
+    const usageObj = {
+        version: 0.1,
+        resource_usage: normalizedUsage || {}
+    };
+    try {
+        const yamlString = yaml.dump(usageObj, {
+            indent: 2,
+            lineWidth: -1,
+            noRefs: true,
+            sortKeys: false,
+            quotingType: '"',
+            forceQuotes: true
+        });
+
+        // Safe logging that doesn't bloat the terminal
+        console.log(`[YAML GEN] Generated YAML for Infracost (${yamlString.length} bytes)`);
+
+        return yamlString;
+    } catch (err) {
+        console.error(`[YAML GEN] Failed to generate YAML: ${err.message}`);
+        // Fallback to a minimal but valid structure
+        return "version: 0.1\nresource_usage: {}\n";
+    }
+}
+
+/**
+ * Convenience wrapper: Normalize + Convert to YAML
+ */
+function generateInfracostUsageFile(deployableServices, usageProfile, provider = 'AWS') {
+    // Note: Provider defaults to AWS for structure if not specified, 
+    // but ideally should be passed. InfracostService passes it implicitly?
+    // Actually infracostService loop calls this, but previously passed (billableServices, usageProfile).
+    // The signature in usageNormalizer.normalizeUsageForInfracost is (usage_profile, deployableServices, provider).
+    // We need to match the call site: usageNormalizer.generateInfracostUsageFile(billableServices, usageProfile)
+
+    // We'll map the params correctly.
+    // Provider is missing in the call site in infracostService.js!
+    // We need to fix the call site in infracostService.js to pass provider, OR infer it.
+    // However, since usage keys are provider-specific (aws_ vs google_), we MUST know the provider.
+
+    // For now, let's look at the call site in infracostService.js:
+    // usageNormalizer.generateInfracostUsageFile(billableServices, usageProfile) 
+    // It's inside generateCostEstimate(provider, ...)
+
+    // So I should also update infracostService.js to pass 'provider'.
+
+    // But first, let's define this function to accept (deployableServices, usageProfile, provider).
+    const usage = normalizeUsageForInfracost(usageProfile, deployableServices, provider || 'AWS');
+    return toInfracostYAML(usage);
+}
+
+module.exports = {
+    normalizeUsageForInfracost,
+    toInfracostYAML,
+    generateInfracostUsageFile
+};

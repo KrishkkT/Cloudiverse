@@ -1,0 +1,18 @@
+const express = require('express');
+const router = express.Router();
+const architectureController = require('../controllers/architectureController');
+
+// Validate service removal
+router.post('/validate-removal', architectureController.validateRemoval);
+
+// Reconcile architecture (future)
+router.post('/reconcile', architectureController.reconcile);
+
+// AI Validation
+router.post('/validate-completeness', architectureController.validateCompleteness);
+
+// Diagram Export & Sharing
+router.post('/export-diagram', architectureController.exportDiagram);
+router.get('/share-metadata/:workspaceId', architectureController.getShareMetadata);
+
+module.exports = router;

@@ -1,0 +1,2544 @@
+{
+  "meta": {
+    "schema": "service_pricing_classification.v1",
+    "pricing_classes": [
+      "DIRECT",
+      "USAGE_BASED",
+      "EXTERNAL",
+      "FREE_TIER"
+    ],
+    "note": "Infracost JSON output already includes skipped resources; --show-skipped is not needed when using --format json."
+  },
+  "services": [
+    {
+      "service_id": "computeserverless",
+      "name": "Serverless Functions",
+      "domain": "core",
+      "category": "compute",
+      "terraform_supported": true,
+      "mandatory_when": [
+        "serverless",
+        "event_driven",
+        "eventing"
+      ],
+      "optional_when": [
+        "hybrid_workload"
+      ],
+      "depends_on": [],
+      "blocks_if_removed": [
+        "serverless_logic"
+      ],
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_lambda_function",
+        "gcp": "google_cloudfunctions_function",
+        "azure": "azurerm_function_app"
+      }
+    },
+    {
+      "service_id": "computecontainer",
+      "name": "Container Service",
+      "domain": "core",
+      "category": "compute",
+      "terraform_supported": true,
+      "mandatory_when": [
+        "backend",
+        "containerized",
+        "processing"
+      ],
+      "optional_when": [],
+      "depends_on": [],
+      "blocks_if_removed": [
+        "backend_logic"
+      ],
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "awsecsservice",
+        "gcp": "google_cloud_run_service",
+        "azure": "azurerm_container_app"
+      }
+    },
+    {
+      "service_id": "computevm",
+      "name": "Virtual Machine",
+      "domain": "core",
+      "category": "compute",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_instance",
+        "gcp": "google_compute_instance",
+        "azure": "azurerm_virtual_machine"
+      }
+    },
+    {
+      "service_id": "computebatch",
+      "name": "Batch Compute",
+      "domain": "core",
+      "category": "compute",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_batch_compute_environment",
+        "gcp": "google_cloud_run_v2_job",
+        "azure": "azurerm_batch_pool"
+      }
+    },
+    {
+      "service_id": "computeedge",
+      "name": "Edge Compute",
+      "domain": "core",
+      "category": "compute",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_lambda_function",
+        "gcp": "google_cloudfunctions_function",
+        "azure": "azurerm_cdn_endpoint"
+      }
+    },
+    {
+      "service_id": "relationaldatabase",
+      "name": "Relational Database",
+      "domain": "core",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_db_instance",
+        "gcp": "google_sql_database_instance",
+        "azure": "azurerm_postgresql_server"
+      }
+    },
+    {
+      "service_id": "nosqldatabase",
+      "name": "NoSQL Database",
+      "domain": "core",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_dynamodb_table",
+        "gcp": "google_firestore_database",
+        "azure": "azurerm_cosmosdb_account"
+      }
+    },
+    {
+      "service_id": "cache",
+      "name": "In-Memory Cache",
+      "domain": "core",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_elasticache_cluster",
+        "gcp": "google_redis_instance",
+        "azure": "azurerm_redis_cache"
+      }
+    },
+    {
+      "service_id": "searchengine",
+      "name": "Search Engine",
+      "domain": "core",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      }
+    },
+    {
+      "service_id": "objectstorage",
+      "name": "Object Storage",
+      "domain": "core",
+      "category": "storage",
+      "terraform_supported": true,
+      "mandatory_when": [
+        "file_storage",
+        "ml_training"
+      ],
+      "optional_when": [
+        "web_app",
+        "mobile_backend"
+      ],
+      "depends_on": [],
+      "blocks_if_removed": [
+        "file_uploads"
+      ],
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_s3_bucket",
+        "gcp": "google_storage_bucket",
+        "azure": "azurerm_storage_account"
+      }
+    },
+    {
+      "service_id": "blockstorage",
+      "name": "Block Storage",
+      "domain": "core",
+      "category": "storage",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_ebs_volume",
+        "gcp": "google_compute_disk",
+        "azure": "azurerm_managed_disk"
+      }
+    },
+    {
+      "service_id": "filestorage",
+      "name": "File Storage",
+      "domain": "core",
+      "category": "storage",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_efs_file_system",
+        "gcp": "google_filestore_instance",
+        "azure": "azurerm_storage_share"
+      }
+    },
+    {
+      "service_id": "backup",
+      "name": "Backup / Disaster Recovery",
+      "domain": "core",
+      "category": "storage",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_backup_vault",
+        "gcp": "google_compute_resource_policy",
+        "azure": "azurerm_backup_vault"
+      }
+    },
+    {
+      "service_id": "apigateway",
+      "name": "API Gateway",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_apigatewayv2_api",
+        "gcp": "google_api_gateway_api",
+        "azure": "azurerm_api_management"
+      }
+    },
+    {
+      "service_id": "loadbalancer",
+      "name": "Load Balancer",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_lb",
+        "gcp": "google_compute_global_forwarding_rule",
+        "azure": "azurerm_lb"
+      }
+    },
+    {
+      "service_id": "paymentgateway",
+      "name": "Payment Gateway",
+      "domain": "core",
+      "category": "fintech",
+      "terraform_supported": false,
+      "providers": {
+        "aws": false,
+        "gcp": false,
+        "azure": false
+      },
+      "pricing": {
+        "class": "EXTERNAL",
+        "infracost_supported": {
+          "aws": false,
+          "gcp": false,
+          "azure": false
+        }
+      }
+    },
+    {
+      "service_id": "identityauth",
+      "name": "Identity & Auth",
+      "domain": "core",
+      "category": "security_identity",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": false
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cognito_user_pool",
+        "gcp": "google_identity_platform_config",
+        "azure": "azurerm_active_directory_domain_service"
+      }
+    },
+    {
+      "service_id": "cdn",
+      "name": "CDN",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudfront_distribution",
+        "gcp": "google_compute_backend_bucket",
+        "azure": "azurerm_cdn_endpoint"
+      }
+    },
+    {
+      "service_id": "dns",
+      "name": "DNS",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_route53_zone",
+        "gcp": "google_dns_managed_zone",
+        "azure": "azurerm_dns_zone"
+      }
+    },
+    {
+      "service_id": "vpcnetworking",
+      "name": "VPC / VNet Networking",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      }
+    },
+    {
+      "service_id": "natgateway",
+      "name": "NAT Gateway",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_nat_gateway",
+        "gcp": "google_compute_router_nat",
+        "azure": "azurerm_nat_gateway"
+      }
+    },
+    {
+      "service_id": "vpn",
+      "name": "VPN",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_vpn_gateway",
+        "gcp": "google_compute_vpn_gateway",
+        "azure": "azurerm_vpn_gateway"
+      }
+    },
+    {
+      "service_id": "privatelink",
+      "name": "Private Connectivity (PrivateLink/PSC)",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_vpc_endpoint",
+        "gcp": "google_compute_service_attachment",
+        "azure": "azurerm_private_endpoint"
+      }
+    },
+    {
+      "service_id": "servicediscovery",
+      "name": "Service Discovery",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_service_discovery_private_dns_namespace",
+        "gcp": "google_service_directory_namespace",
+        "azure": "azurerm_private_dns_zone"
+      }
+    },
+    {
+      "service_id": "servicemesh",
+      "name": "Service Mesh",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": false
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_appmesh_mesh",
+        "gcp": "google_gke_hub_feature_membership",
+        "azure": false
+      }
+    },
+    {
+      "service_id": "messagequeue",
+      "name": "Message Queue",
+      "domain": "core",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sqs_queue",
+        "gcp": "google_pubsub_subscription",
+        "azure": "azurerm_servicebus_queue"
+      }
+    },
+    {
+      "service_id": "eventbus",
+      "name": "Event Bus",
+      "domain": "core",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_event_bus",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_eventgrid_topic"
+      }
+    },
+    {
+      "service_id": "workfloworchestration",
+      "name": "Workflow Orchestration",
+      "domain": "core",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sfn_state_machine",
+        "gcp": "google_workflows_workflow",
+        "azure": "azurerm_logic_app_workflow"
+      }
+    },
+    {
+      "service_id": "notification",
+      "name": "Notification Service",
+      "domain": "core",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sns_topic",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_notification_hub"
+      }
+    },
+    {
+      "service_id": "emailnotification",
+      "name": "Email Service",
+      "domain": "core",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_ses_domain_identity",
+        "gcp": "google_cloud_tasks_queue",
+        "azure": null
+      }
+    },
+    {
+      "service_id": "secretsmanagement",
+      "name": "Secrets Management",
+      "domain": "core",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_secretsmanager_secret",
+        "gcp": "google_secret_manager_secret",
+        "azure": "azurerm_key_vault_secret"
+      }
+    },
+    {
+      "service_id": "keymanagement",
+      "name": "Key Management (KMS)",
+      "domain": "core",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_kms_key",
+        "gcp": "google_kms_crypto_key",
+        "azure": "azurerm_key_vault_key"
+      }
+    },
+    {
+      "service_id": "certificatemanagement",
+      "name": "Certificate Management",
+      "domain": "core",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_acm_certificate",
+        "gcp": "google_certificate_manager_certificate",
+        "azure": "azurerm_key_vault_certificate"
+      }
+    },
+    {
+      "service_id": "waf",
+      "name": "Web Application Firewall",
+      "domain": "core",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_wafv2_web_acl",
+        "gcp": "google_compute_security_policy",
+        "azure": "azurerm_web_application_firewall_policy"
+      }
+    },
+    {
+      "service_id": "ddosprotection",
+      "name": "DDoS Protection",
+      "domain": "core",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_shield_protection",
+        "gcp": "google_compute_security_policy",
+        "azure": "azurerm_network_ddos_protection_plan"
+      }
+    },
+    {
+      "service_id": "policygovernance",
+      "name": "Policy / Governance",
+      "domain": "core",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_config_config_rule",
+        "gcp": "google_org_policy_policy",
+        "azure": "azurerm_policy_definition"
+      }
+    },
+    {
+      "service_id": "logging",
+      "name": "Logging",
+      "domain": "core",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_log_group",
+        "gcp": "google_logging_project_sink",
+        "azure": "azurerm_log_analytics_workspace"
+      }
+    },
+    {
+      "service_id": "monitoring",
+      "name": "Monitoring",
+      "domain": "core",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_metric_alarm",
+        "gcp": "google_monitoring_alert_policy",
+        "azure": "azurerm_monitor_metric_alert"
+      }
+    },
+    {
+      "service_id": "tracing",
+      "name": "Distributed Tracing / APM",
+      "domain": "core",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_xray_group",
+        "gcp": "google_monitoring_custom_service",
+        "azure": "azurerm_application_insights"
+      }
+    },
+    {
+      "service_id": "siem",
+      "name": "SIEM / Security Analytics",
+      "domain": "core",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_securityhub_account",
+        "gcp": "google_scc_source",
+        "azure": "azurerm_sentinel_alert_rule"
+      }
+    },
+    {
+      "service_id": "containerregistry",
+      "name": "Container Registry",
+      "domain": "core",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_ecr_repository",
+        "gcp": "google_artifact_registry_repository",
+        "azure": "azurerm_container_registry"
+      }
+    },
+    {
+      "service_id": "cicd",
+      "name": "CI/CD",
+      "domain": "core",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_codepipeline",
+        "gcp": "google_cloudbuild_trigger",
+        "azure": "azurerm_devops_pipeline"
+      }
+    },
+    {
+      "service_id": "artifactrepository",
+      "name": "Artifact Repository",
+      "domain": "core",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_codeartifact_domain",
+        "gcp": "google_artifact_registry_repository",
+        "azure": "azurerm_container_registry"
+      }
+    },
+    {
+      "service_id": "pushnotificationservice",
+      "name": "Push Notification Service",
+      "domain": "core",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sns_platform_application",
+        "gcp": "google_firebase_project",
+        "azure": "azurerm_notification_hub"
+      }
+    },
+    {
+      "service_id": "websocketgateway",
+      "name": "WebSocket Gateway",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_apigatewayv2_api",
+        "gcp": null,
+        "azure": null
+      }
+    },
+    {
+      "service_id": "globalloadbalancer",
+      "name": "Global Load Balancer",
+      "domain": "core",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_globalaccelerator_accelerator",
+        "gcp": "google_compute_global_forwarding_rule",
+        "azure": "azurerm_frontdoor"
+      }
+    },
+    {
+      "service_id": "multiregiondb",
+      "name": "Multi-Region Database",
+      "domain": "core",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_rds_global_cluster",
+        "gcp": "google_sql_database_instance",
+        "azure": "azurerm_cosmosdb_account"
+      }
+    },
+    {
+      "service_id": "iotcore",
+      "name": "IoT Core / Hub",
+      "domain": "iot",
+      "category": "iot",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": false,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_iot_thing",
+        "gcp": "google_cloudiot_registry",
+        "azure": "azurerm_iothub"
+      }
+    },
+    {
+      "service_id": "deviceregistry",
+      "name": "Device Registry / Provisioning",
+      "domain": "iot",
+      "category": "iot",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": false,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_iot_thing",
+        "gcp": "google_cloudiot_registry",
+        "azure": "azurerm_iothub_dps"
+      }
+    },
+    {
+      "service_id": "digitaltwin",
+      "name": "Device Shadow / Digital Twin",
+      "domain": "iot",
+      "category": "iot",
+      "terraform_supported": true,
+      "providers": {
+        "aws": false,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_iot_thing",
+        "gcp": null,
+        "azure": "azurerm_digital_twins_instance"
+      }
+    },
+    {
+      "service_id": "eventstream",
+      "name": "Telemetry Event Stream",
+      "domain": "iot",
+      "category": "integration",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_kinesis_stream",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_eventhub"
+      }
+    },
+    {
+      "service_id": "streamprocessor",
+      "name": "Stream Processing",
+      "domain": "iot",
+      "category": "analytics",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_kinesis_analytics_application",
+        "gcp": "google_dataflow_job",
+        "azure": "azurerm_stream_analytics_job"
+      }
+    },
+    {
+      "service_id": "timeseriesdatabase",
+      "name": "Time Series Database",
+      "domain": "iot",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_timestream_database",
+        "gcp": null,
+        "azure": "azurerm_iot_time_series_insights_gen2_environment"
+      }
+    },
+    {
+      "service_id": "iotedgegateway",
+      "name": "IoT Edge Gateway",
+      "domain": "iot",
+      "category": "iot",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": false,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_iot_thing",
+        "gcp": "google_cloudiot_registry",
+        "azure": "azurerm_iothub"
+      }
+    },
+    {
+      "service_id": "otaupdates",
+      "name": "Over-the-Air (OTA) Updates",
+      "domain": "iot",
+      "category": "iot",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": false,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_iot_thing",
+        "gcp": null,
+        "azure": null
+      }
+    },
+    {
+      "service_id": "mltraining",
+      "name": "ML Training",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_notebook_instance",
+        "gcp": "google_notebooks_instance",
+        "azure": "azurerm_machine_learning_compute_instance"
+      }
+    },
+    {
+      "service_id": "mlinference",
+      "name": "ML Inference / Endpoint",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_endpoint_configuration",
+        "gcp": "google_vertex_ai_endpoint",
+        "azure": "azurerm_machine_learning_compute_instance"
+      }
+    },
+    {
+      "service_id": "featurestore",
+      "name": "Feature Store",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_feature_group",
+        "gcp": "google_vertex_ai_featurestore",
+        "azure": null
+      }
+    },
+    {
+      "service_id": "modelregistry",
+      "name": "Model Registry",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_domain",
+        "gcp": "google_artifact_registry_repository",
+        "azure": "azurerm_machine_learning_workspace"
+      }
+    },
+    {
+      "service_id": "experimenttracking",
+      "name": "Experiment Tracking",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_domain",
+        "gcp": "google_vertex_ai_tensorboard",
+        "azure": "azurerm_machine_learning_workspace"
+      }
+    },
+    {
+      "service_id": "mlpipelineorchestration",
+      "name": "ML Pipelines / Orchestration",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_domain",
+        "gcp": "google_vertex_ai_pipeline_job",
+        "azure": "azurerm_machine_learning_workspace"
+      }
+    },
+    {
+      "service_id": "vectordatabase",
+      "name": "Vector Database (RAG / Semantic Search)",
+      "domain": "ml",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_opensearch_domain",
+        "gcp": "google_vertex_ai_index",
+        "azure": "azurerm_search_service"
+      }
+    },
+    {
+      "service_id": "modelmonitoring",
+      "name": "Model Monitoring / Drift",
+      "domain": "ml",
+      "category": "ml",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sagemaker_domain",
+        "gcp": "google_vertex_ai_endpoint",
+        "azure": "azurerm_machine_learning_workspace"
+      }
+    },
+    {
+      "service_id": "datawarehouse",
+      "name": "Data Warehouse",
+      "domain": "analytics",
+      "category": "database",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_redshift_cluster",
+        "gcp": "google_bigquery_dataset",
+        "azure": "azurerm_synapse_workspace"
+      }
+    },
+    {
+      "service_id": "datalake",
+      "name": "Data Lake",
+      "domain": "analytics",
+      "category": "storage",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_s3_bucket",
+        "gcp": "google_storage_bucket",
+        "azure": "azurerm_storage_data_lake_gen2_filesystem"
+      }
+    },
+    {
+      "service_id": "etlorchestration",
+      "name": "ETL Orchestration",
+      "domain": "analytics",
+      "category": "analytics",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_glue_job",
+        "gcp": "google_dataflow_job",
+        "azure": "azurerm_data_factory"
+      }
+    },
+    {
+      "service_id": "datacatalog",
+      "name": "Data Catalog / Governance",
+      "domain": "analytics",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_glue_catalog_database",
+        "gcp": "google_data_catalog_entry_group",
+        "azure": "azurerm_purview_account"
+      }
+    },
+    {
+      "service_id": "bidashboard",
+      "name": "BI Dashboards",
+      "domain": "analytics",
+      "category": "analytics",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_quicksight_user",
+        "gcp": "google_looker_instance",
+        "azure": "azurerm_powerbi_embedded"
+      }
+    },
+    {
+      "service_id": "keymanagementservice",
+      "alias_of": "keymanagement",
+      "name": "Key Management Service",
+      "domain": "security",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_kms_key",
+        "gcp": "google_kms_crypto_key",
+        "azure": "azurerm_key_vault_key"
+      }
+    },
+    {
+      "service_id": "iampolicy",
+      "name": "IAM Policies & Governance",
+      "domain": "security",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_iam_policy",
+        "gcp": "google_project_iam_policy",
+        "azure": "azurerm_role_assignment"
+      }
+    },
+    {
+      "service_id": "vulnerabilityscanner",
+      "name": "Vulnerability Scanning",
+      "domain": "security",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_inspector_assessment_target",
+        "gcp": null,
+        "azure": null
+      }
+    },
+    {
+      "service_id": "datalossprevention",
+      "name": "Data Loss Prevention",
+      "domain": "security",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": false,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": null,
+        "gcp": "google_data_loss_prevention_job_trigger",
+        "azure": "azurerm_purview_account"
+      }
+    },
+    {
+      "service_id": "securityposture",
+      "name": "Cloud Security Posture Management",
+      "domain": "security",
+      "category": "security",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_securityhub_account",
+        "gcp": "google_scc_source",
+        "azure": "azurerm_security_center_subscription_pricing"
+      }
+    },
+    {
+      "service_id": "vpc",
+      "name": "Virtual Private Cloud",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_vpc",
+        "gcp": "google_compute_network",
+        "azure": "azurerm_virtual_network"
+      }
+    },
+    {
+      "service_id": "subnet",
+      "name": "Subnet",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_subnet",
+        "gcp": "google_compute_subnetwork",
+        "azure": "azurerm_subnet"
+      }
+    },
+    {
+      "service_id": "vpngateway",
+      "name": "VPN Gateway",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_vpn_gateway",
+        "gcp": "google_compute_vpn_gateway",
+        "azure": "azurerm_vpn_gateway"
+      }
+    },
+    {
+      "service_id": "internetgateway",
+      "name": "Internet Gateway",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_internet_gateway",
+        "gcp": "google_compute_router",
+        "azure": "azurerm_virtual_network_gateway"
+      }
+    },
+    {
+      "service_id": "transitgateway",
+      "name": "Transit Gateway",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_ec2_transit_gateway",
+        "gcp": "google_compute_router",
+        "azure": "azurerm_virtual_hub"
+      }
+    },
+    {
+      "service_id": "networkfirewall",
+      "name": "Network Firewall",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_network_firewall_firewall",
+        "gcp": "google_compute_firewall",
+        "azure": "azurerm_firewall"
+      }
+    },
+    {
+      "service_id": "securitygroup",
+      "name": "Security Group",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_security_group",
+        "gcp": "google_compute_firewall",
+        "azure": "azurerm_network_security_group"
+      }
+    },
+    {
+      "service_id": "egressproxy",
+      "name": "Egress Proxy",
+      "domain": "networking",
+      "category": "network",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_nat_gateway",
+        "gcp": "google_compute_router_nat",
+        "azure": null
+      }
+    },
+    {
+      "service_id": "buildservice",
+      "name": "Build Service",
+      "domain": "devops",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_codebuild_project",
+        "gcp": "google_cloudbuild_trigger",
+        "azure": "azurerm_container_registry_task"
+      }
+    },
+    {
+      "service_id": "configmanagement",
+      "name": "Config Management",
+      "domain": "devops",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": false,
+          "azure": false
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_ssm_parameter",
+        "gcp": null,
+        "azure": null
+      }
+    },
+    {
+      "service_id": "parameterstore",
+      "name": "Parameter Store",
+      "domain": "devops",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_ssm_parameter",
+        "gcp": "google_secret_manager_secret",
+        "azure": "azurerm_app_configuration"
+      }
+    },
+    {
+      "service_id": "iacstate",
+      "name": "IaC State Backend",
+      "domain": "devops",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_s3_bucket",
+        "gcp": "google_storage_bucket",
+        "azure": "azurerm_storage_account"
+      }
+    },
+    {
+      "service_id": "statelocking",
+      "name": "State Locking",
+      "domain": "devops",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_dynamodb_table",
+        "gcp": "google_storage_bucket",
+        "azure": "azurerm_storage_account"
+      }
+    },
+    {
+      "service_id": "sourcecontrol",
+      "name": "Source Control",
+      "domain": "devops",
+      "category": "devops",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "EXTERNAL",
+        "infracost_supported": {
+          "aws": false,
+          "gcp": false,
+          "azure": false
+        }
+      }
+    },
+    {
+      "service_id": "apm",
+      "name": "Application Performance Monitoring",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_xray_group",
+        "gcp": "google_monitoring_custom_service",
+        "azure": "azurerm_application_insights"
+      }
+    },
+    {
+      "service_id": "metrics",
+      "name": "Custom Metrics",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_metric_alarm",
+        "gcp": "google_monitoring_metric_descriptor",
+        "azure": "azurerm_monitor_metric_alert"
+      }
+    },
+    {
+      "service_id": "alerting",
+      "name": "Alerting & On-Call",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_metric_alarm",
+        "gcp": "google_monitoring_alert_policy",
+        "azure": "azurerm_monitor_action_group"
+      }
+    },
+    {
+      "service_id": "incidentmanagement",
+      "name": "Incident Management",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "EXTERNAL",
+        "infracost_supported": {
+          "aws": false,
+          "gcp": false,
+          "azure": false
+        }
+      }
+    },
+    {
+      "service_id": "auditlogging",
+      "name": "Audit Logs",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudtrail",
+        "gcp": "google_logging_project_sink",
+        "azure": "azurerm_monitor_activity_log_alert"
+      }
+    },
+    {
+      "service_id": "logaggregation",
+      "name": "Log Aggregation",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_log_group",
+        "gcp": "google_logging_project_sink",
+        "azure": "azurerm_log_analytics_workspace"
+      }
+    },
+    {
+      "service_id": "dashboard",
+      "name": "Monitoring Dashboard",
+      "domain": "observability",
+      "category": "observability",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_cloudwatch_dashboard",
+        "gcp": "google_monitoring_dashboard",
+        "azure": "azurerm_portal_dashboard"
+      }
+    },
+    {
+      "service_id": "deadletterqueue",
+      "name": "Dead Letter Queue",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sqs_queue",
+        "gcp": "google_pubsub_subscription",
+        "azure": "azurerm_servicebus_queue"
+      }
+    },
+    {
+      "service_id": "pubsub",
+      "name": "Pub/Sub Topic",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_sns_topic",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_servicebus_topic"
+      }
+    },
+    {
+      "service_id": "eventstreaming",
+      "name": "Event Streaming (Kafka)",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_kinesis_stream",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_eventhub"
+      }
+    },
+    {
+      "service_id": "kinesisstream",
+      "name": "Data Stream",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "USAGE_BASED",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_kinesis_stream",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_eventhub"
+      }
+    },
+    {
+      "service_id": "batchjob",
+      "name": "Batch Job Processing",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "DIRECT",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_batch_job_definition",
+        "gcp": "google_cloud_run_v2_job",
+        "azure": "azurerm_batch_job"
+      }
+    },
+    {
+      "service_id": "smsnotification",
+      "name": "SMS Notification",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "EXTERNAL",
+        "infracost_supported": {
+          "aws": false,
+          "gcp": false,
+          "azure": false
+        }
+      }
+    },
+    {
+      "service_id": "webhookintegration",
+      "name": "Webhook Integration",
+      "domain": "messaging",
+      "category": "messaging",
+      "terraform_supported": true,
+      "providers": {
+        "aws": true,
+        "gcp": true,
+        "azure": true
+      },
+      "pricing": {
+        "class": "FREE_TIER",
+        "infracost_supported": {
+          "aws": true,
+          "gcp": true,
+          "azure": true
+        }
+      },
+      "infracost_resource_type": {
+        "aws": "aws_apigatewayv2_api",
+        "gcp": "google_pubsub_topic",
+        "azure": "azurerm_eventgrid_topic"
+      }
+    }
+  ]
+}

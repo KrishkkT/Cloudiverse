@@ -1,0 +1,722 @@
+const express = require('express');
+const router = express.Router();
+const pool = require('../config/db');
+const authMiddleware = require('../middleware/auth');
+const emailService = require('../utils/emailService');
+const billingService = require('../services/billing/billingService');
+const auditService = require('../services/core/auditService');
+const { decrypt } = require('../utils/crypto');
+
+/**
+ * @route POST /api/workspaces/save
+ * @desc Save current draft state (Creates new or Updates existing)
+ * @access Private
+ */
+router.post('/save', authMiddleware, async (req, res) => {
+  try {
+    const { workspaceId, projectId, name, step, state } = req.body;
+
+    // Validation
+    if (!step || !state) {
+      return res.status(400).json({ msg: "Step and State are required" });
+    }
+
+    let currentWorkspaceId = workspaceId;
+    let targetProjectId = projectId;
+
+    // 1. UPDATE EXISTING WORKSPACE
+    // If the client sent a workspaceId, we try to update that record.
+    if (currentWorkspaceId) {
+      const updateRes = await pool.resilientQuery(
+        `UPDATE workspaces 
+                 SET step = $1, 
+                     state_json = (
+                       -- Merge incoming state with preserved infra_outputs
+                       $2::jsonb || jsonb_build_object('infra_outputs', COALESCE(state_json->'infra_outputs', 'null'::jsonb))
+                     ),
+                     name = COALESCE($3, name), 
+                     updated_at = NOW(), 
+                     save_count = save_count + 1
+                 WHERE id = $4 
+                 RETURNING id, project_id, updated_at, save_count`,
+        [step, state, name, currentWorkspaceId]
+      );
+
+      // If update succeeded, return it.
+      if (updateRes.rows.length > 0) {
+        const updatedWs = updateRes.rows[0];
+
+        // Log Update Activity (every 5th save to avoid spamming, but always log milestones)
+        const isMilestone = step === 'deployed' || step === 'deployment_summary' || step === 'review_spec';
+        if (updatedWs.save_count % 5 === 0 || isMilestone) {
+            let logAction = 'CONFIGURATION_UPDATED';
+            if (step === 'deployed' || step === 'deployment_summary') logAction = 'DEPLOYMENT_COMPLETED';
+            if (step === 'review_spec') logAction = 'ARCHITECTURE_ANALYZED';
+            
+            await auditService.log(req.user.id, currentWorkspaceId, logAction, { step, name });
+        }
+
+        // ALSO UPDATE PARENT PROJECT Metadata (Name & Description)
+        // Prioritize Generated Summary, then User Input, then Default
+        const msgDescription = state?.infraSpec?.project_summary || state?.description || "Auto-saved draft";
+        await pool.resilientQuery(
+          "UPDATE projects SET name = COALESCE($1, name), description = $2 WHERE id::text = $3::text",
+          [name, msgDescription, updatedWs.project_id]
+        );
+
+        return res.json({
+          msg: "Draft Updated",
+          workspaceId: updatedWs.id,
+          projectId: updatedWs.project_id,
+          updatedAt: updatedWs.updated_at
+        });
+      }
+
+      // If we are here, the ID was not found (deleted?). 
+      // FALLBACK: Allow execution to continue to INSERT a new record instead of 404ing.
+      // We explicitly set currentWorkspaceId to null to trigger the create flow.
+      console.log(`Workspace ${currentWorkspaceId} not found during update. Creating new copy.`);
+      currentWorkspaceId = null;
+    }
+
+    // 2. CREATE NEW PROJECT (IF NEEDED) OR VERIFY EXISTENCE
+    // If we have a targetProjectId, we must ensure it actually exists in the DB.
+    // If it doesn't exist (e.g. user cleared DB), we must create a NEW one to avoid FK error.
+    if (targetProjectId) {
+      const projCheck = await pool.resilientQuery("SELECT id FROM projects WHERE id::text = $1::text", [targetProjectId]);
+      if (projCheck.rows.length === 0) {
+        console.log(`Project ${targetProjectId} not found. Creating new project container.`);
+        targetProjectId = null; // Reset to force creation below
+      }
+    }
+
+    if (!targetProjectId) {
+      const projRes = await pool.resilientQuery(
+        "INSERT INTO projects (name, description, owner_id) VALUES ($1, $2, $3) RETURNING id",
+        [name || "Untitled Draft", "Auto-saved draft", req.user?.id || null]
+      );
+      targetProjectId = projRes.rows[0].id;
+    }
+
+    // 3. INSERT NEW WORKSPACE
+    const saveRes = await pool.resilientQuery(
+      "INSERT INTO workspaces (project_id, name, step, state_json, save_count) VALUES ($1, $2, $3, $4, 1) RETURNING id, updated_at",
+      [targetProjectId, name || "Draft", step, state]
+    );
+
+    res.json({
+      msg: "Draft Created",
+      workspaceId: saveRes.rows[0].id,
+      projectId: targetProjectId,
+      updatedAt: saveRes.rows[0].updated_at
+    });
+
+    // Log Creation Activity
+    await auditService.log(req.user.id, saveRes.rows[0].id, 'WORKSPACE_CREATE', { name, step });
+
+  } catch (err) {
+    console.error("Save Draft Error:", err);
+    console.error("Payload size approx:", JSON.stringify(req.body).length);
+    res.status(500).json({
+      msg: "Server Error during save",
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  }
+});
+
+// ... existing POST /save code ...
+
+/**
+ * @route GET /api/workspaces/:id
+ * @desc Get workspace state by ID
+ * @access Private
+ */
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.resilientQuery(
+      "SELECT * FROM workspaces WHERE id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    const workspace = result.rows[0];
+    
+    // Decrypt environment variables for the UI
+    if (workspace.state_json?.user_env_vars) {
+      const decryptedVars = {};
+      for (const [k, v] of Object.entries(workspace.state_json.user_env_vars)) {
+        decryptedVars[k] = decrypt(v);
+      }
+      workspace.state_json.user_env_vars = decryptedVars;
+    }
+
+    res.json(workspace);
+  } catch (err) {
+    console.error("Get Workspace Error:", err);
+    res.status(500).send("Server Error");
+  }
+});
+
+/**
+ * @route POST /api/workspaces
+ * @desc Create a new Workspace (and Project)
+ * @access Private
+ */
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { name, description, project_data } = req.body;
+    const userId = req.user.id;
+
+    // 1. Check Usage Limits (Free Tier = 3 Projects)
+    const planStatus = await billingService.getPlanStatus(userId);
+
+    if (planStatus.plan === 'free') {
+      // A. Check Project Limits (Active Deployments Only)
+      // "Limit is active only if 3 deployed projects exist"
+      const countRes = await pool.resilientQuery(
+        `SELECT COUNT(*) FROM workspaces w 
+         JOIN projects p ON w.project_id::text = p.id::text 
+         WHERE p.owner_id::text = $1::text AND w.state_json->>'is_deployed' = 'true'`,
+        [userId]
+      );
+
+      const currentCount = parseInt(countRes.rows[0].count);
+      const limit = planStatus.limits?.projects || 3;
+
+      if (currentCount >= limit) {
+        return res.status(403).json({
+          msg: "Free tier limit reached (Max 3 Active Deployments). Upgrade to Pro for unlimited deployments.",
+          limitReached: true
+        });
+      }
+
+      // B. Security Check: Device Limit (Max 2 accounts per physical device)
+      const userRes = await pool.resilientQuery("SELECT device_id FROM users WHERE id = $1", [userId]);
+      const deviceId = userRes.rows[0]?.device_id;
+
+      if (deviceId) {
+        // Count how many unique user IDs are associated with this device_id
+        const deviceCountRes = await pool.resilientQuery(
+          "SELECT COUNT(DISTINCT id) FROM users WHERE device_id = $1",
+          [deviceId]
+        );
+        const accountCount = parseInt(deviceCountRes.rows[0].count);
+
+        if (accountCount > 2) {
+          return res.status(403).json({
+            msg: "Security Limit: This device is already associated with 2 or more accounts. Please use one of your existing accounts to continue on the Free Tier.",
+            limitReached: true
+          });
+        }
+      }
+    }
+
+    // 2. Create Project
+    const projRes = await pool.resilientQuery(
+      "INSERT INTO projects (name, description, owner_id) VALUES ($1, $2, $3) RETURNING id",
+      [name || "Untitled Project", description, req.user?.id || null]
+    );
+    const projectId = projRes.rows[0].id;
+
+    // 2. Create Workspace
+    // Initial state includes the description provided by the user
+    const initialState = {
+      projectData: {
+        name: name,
+        description: description,
+        // ...project_data can be merged if needed
+      },
+      history: [],
+      currentQuestion: null
+    };
+
+    const workspaceRes = await pool.resilientQuery(
+      "INSERT INTO workspaces (project_id, name, step, state_json) VALUES ($1, $2, $3, $4) RETURNING id, updated_at",
+      [projectId, name || "Untitled Workspace", "input", initialState]
+    );
+
+    const workspaceId = workspaceRes.rows[0].id;
+    await auditService.log(req.user.id, workspaceId, 'WORKSPACE_CREATE', { name });
+
+    res.json({
+      id: workspaceId,
+      project_id: projectId,
+      name: name,
+      description: description,
+      created_at: workspaceRes.rows[0].updated_at // using updated_at as created proxy
+    });
+
+  } catch (err) {
+    console.error("Create Workspace Error:", err);
+    res.status(500).send("Server Error");
+  }
+});
+
+/**
+ * @route GET /api/workspaces
+ * @desc Get all workspaces (List view)
+ * @access Private
+ */
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    // Filter by authenticated user's ID to ensure isolation
+    const userId = req.user.id;
+    // console.log(`[GET /workspaces] Fetching for User ID: ${userId}`);
+
+    const result = await pool.resilientQuery(
+      `SELECT 
+        w.id, 
+        w.name, 
+        w.step, 
+        w.deployment_status,
+        w.deployed_at,
+        w.updated_at, 
+        w.save_count,
+        w.project_id,
+        w.state_json,
+        p.description, 
+        p.created_at 
+      FROM workspaces w 
+      JOIN projects p ON w.project_id::text = p.id::text 
+      WHERE p.owner_id::text = $1::text
+      ORDER BY w.updated_at DESC`,
+      [String(userId)] // Ensure it's a string for VARCHAR comparison
+    );
+
+    // console.log(`[GET /workspaces] Found ${result.rows.length} workspaces`);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("List Workspaces Error:", err);
+    res.status(500).send("Server Error");
+  }
+});
+
+/**
+ * @route DELETE /api/workspaces/:id
+ * @desc Delete a workspace (and its parent project to clean up)
+ * @access Private
+ */
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Retrieve project_id and state_json first
+    const wsRes = await pool.resilientQuery("SELECT project_id, name, state_json FROM workspaces WHERE id = $1", [id]);
+
+    if (wsRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    const { project_id: projectId, name: workspaceName, state_json } = wsRes.rows[0];
+
+    // Prevent deletion of DEPLOYED projects UNLESS force is specified
+    const { force } = req.query;
+    if ((state_json?.is_deployed === true || state_json?.is_deployed === "true") && force !== 'true') {
+      return res.status(400).json({
+        msg: "Cannot delete a deployed project. Please undeploy/destroy infrastructure first, or use force delete."
+      });
+    }
+
+    // Delete the Project (Cascades to Workspace)
+    await pool.resilientQuery("DELETE FROM projects WHERE id::text = $1::text", [projectId]);
+
+    // Log Deletion Activity
+    await auditService.log(req.user.id, id, 'WORKSPACE_DELETE', { name: workspaceName });
+
+    res.json({ msg: "Workspace and Project deleted" });
+  } catch (err) {
+    console.error("Delete Workspace Error:", err);
+    res.status(500).send("Server Error");
+  }
+});
+
+/**
+ * @route PUT /api/workspaces/:id/deploy
+ * @desc Mark workspace as ACTIVE DEPLOYMENT and increment active_deployments count
+ * @access Private
+ */
+router.put('/:id/deploy', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { deployment_method, provider } = req.body;
+
+    // Get workspace data including state for email
+    const wsRes = await pool.resilientQuery(
+      "SELECT project_id, name, state_json FROM workspaces WHERE id = $1",
+      [id]
+    );
+
+    if (wsRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    const { project_id: projectId, name: workspaceName, state_json: stateJson } = wsRes.rows[0];
+
+    // Update workspace to active deployment status
+    const updateWorkspaceRes = await pool.resilientQuery(
+      `UPDATE workspaces 
+       SET state_json = COALESCE(state_json, '{}'::jsonb) || $1::jsonb,
+       step = 'deployed',
+       updated_at = NOW()
+       WHERE id = $2 AND (state_json->>'is_deployed' IS NULL OR state_json->>'is_deployed' != 'true')
+       RETURNING id`,
+      [
+        JSON.stringify({
+          is_deployed: true,
+          is_live: true,
+          deployment: {
+            method: deployment_method,
+            provider,
+            deployed_at: new Date().toISOString()
+          }
+        }),
+        id
+      ]
+    );
+
+    // Only proceed with side effects if the update actually happened (idempotency key)
+    let newCount = 0;
+    if (updateWorkspaceRes.rowCount > 0) {
+      // Increment active_deployments count in projects table
+      const updateResult = await pool.resilientQuery(
+        `UPDATE projects 
+           SET active_deployments = COALESCE(active_deployments, 0) + 1,
+               updated_at = NOW()
+           WHERE id::text = $1::text
+           RETURNING active_deployments`,
+        [projectId]
+      );
+
+      if (updateResult.rows.length === 0) {
+        console.error(`[DEPLOYMENT] Project ${projectId} not found`);
+        return res.status(404).json({ msg: "Project not found" });
+      }
+
+      newCount = updateResult.rows[0].active_deployments;
+      console.log(`[DEPLOYMENT] Workspace ${id} marked as ACTIVE DEPLOYMENT - ${deployment_method} to ${provider}`);
+      console.log(`[DEPLOYMENT] Project ${projectId} active_deployments incremented to ${newCount}`);
+
+      // Send Deployment Ready Email
+      try {
+        const userRes = await pool.resilientQuery("SELECT email, name FROM users WHERE id = $1", [req.user.id]);
+
+        // 🔥 FIX: Prevent duplicate emails by checking both is_deployed and the specific timestamp
+        // Even if requests are concurrent, rowCount > 0 from line 362 block already provides isolation.
+        // We add this as extra defense in depth.
+        const alreadySent = stateJson?.deployment_email_sent_at || stateJson?.is_deployed === true;
+
+        if (userRes.rows.length > 0 && !alreadySent) {
+          const infraSpec = stateJson?.infraSpec || {};
+          const costEstimation = stateJson?.costEstimation || {};
+          const selectedProvider = provider || infraSpec?.resolved_region?.provider || 'unknown';
+
+          await emailService.sendDeploymentReadyEmail(userRes.rows[0], {
+            workspaceId: id, // Pass ID for report link
+            workspaceName: workspaceName || 'Untitled Project',
+            provider: selectedProvider,
+            estimatedCost: costEstimation?.rankings?.find(r => r.provider?.toLowerCase() === selectedProvider?.toLowerCase())?.formatted_cost
+              || costEstimation?.recommended?.formatted_cost
+              || 'N/A',
+            pattern: infraSpec?.canonical_architecture?.pattern_name || infraSpec?.pattern_key || 'Custom',
+            services: infraSpec?.canonical_architecture?.deployable_services || [],
+            region: infraSpec?.resolved_region?.resolved || infraSpec?.resolved_region?.logical || 'Default'
+          });
+          console.log(`[DEPLOYMENT] First-time deployment: Sent email to ${userRes.rows[0].email}`);
+
+          // Update state to record email sent
+          await pool.resilientQuery(
+            `UPDATE workspaces 
+             SET state_json = jsonb_set(state_json, '{deployment_email_sent_at}', $1)
+             WHERE id = $2`,
+            [JSON.stringify(new Date().toISOString()), id]
+          );
+        } else if (alreadySent) {
+          console.log(`[DEPLOYMENT] Skipping email - already sent at ${alreadySent}`);
+        }
+      } catch (emailErr) {
+        console.error("Failed to send deployment email:", emailErr);
+      }
+    } else {
+      console.log(`[DEPLOYMENT] Workspace ${id} already deployed - skipping increment/email`);
+    }
+
+    res.json({
+      msg: "Workspace self-deployed - active_deployments incremented",
+      id,
+      deployment_method,
+      provider,
+      status: 'active_self_deployed',
+      active_deployments: newCount
+    });
+  } catch (err) {
+    console.error("Deploy Workspace Error:", err);
+    console.error("Error details:", err.message);
+    console.error("Error stack:", err.stack);
+
+    // Check if it's a column missing error
+    if (err.message && err.message.includes('active_deployments')) {
+      return res.status(500).json({
+        msg: "Database schema missing active_deployments column. Please run migrations.",
+        error: err.message
+      });
+    }
+
+    res.status(500).json({ msg: "Server Error", error: err.message });
+  }
+});
+
+/**
+ * @route PUT /api/workspaces/:id/suggestion-preference
+ * @desc Toggle using_suggestion preference for self-deployment projects
+ * @access Private
+ */
+router.put('/:id/suggestion-preference', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { using_suggestion } = req.body;
+
+    // Get current state_json
+    const wsRes = await pool.resilientQuery(
+      "SELECT state_json FROM workspaces WHERE id = $1",
+      [id]
+    );
+
+    if (wsRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    // Update state_json with using_suggestion preference
+    const currentState = wsRes.rows[0].state_json || {};
+    const updatedState = {
+      ...currentState,
+      using_suggestion: using_suggestion
+    };
+
+    await pool.resilientQuery(
+      `UPDATE workspaces SET state_json = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(updatedState), id]
+    );
+
+    console.log(`[WORKSPACE] Using suggestion preference updated to ${using_suggestion} for workspace ${id}`);
+
+    res.json({
+      msg: "Suggestion preference updated",
+      id,
+      using_suggestion
+    });
+  } catch (err) {
+    console.error("Toggle Suggestion Preference Error:", err);
+    res.status(500).json({ msg: "Server Error", error: err.message });
+  }
+});
+
+
+
+/**
+ * @route PUT /api/workspaces/:id/live-status
+ * @desc Toggle project live/offline status
+ * @access Private
+ */
+router.put('/:id/live-status', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_live } = req.body;
+
+    // Get current state_json with robust ownership check (Project Owner OR Workspace User)
+    const wsRes = await pool.resilientQuery(
+      `SELECT w.state_json 
+       FROM workspaces w
+       JOIN projects p ON w.project_id::text = p.id::text
+       WHERE w.id::text = $1::text AND (p.owner_id::text = $2::text OR w.user_id::text = $2::text)`,
+      [id, String(req.user.id)]
+    );
+
+    if (wsRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    // Update state_json with live status AND enforce step='deployed'
+    const currentState = wsRes.rows[0].state_json || {};
+    const updatedState = {
+      ...currentState,
+      is_live: is_live,
+      is_deployed: is_live, // Sync deployed flag with live status as requested
+      live_status_updated_at: new Date().toISOString()
+    };
+
+    // We also update 'step' to 'deployed' to ensure the toggle remains visible 
+    // even if is_deployed becomes false (OFF).
+    await pool.resilientQuery(
+      `UPDATE workspaces 
+       SET state_json = $1, 
+           step = 'deployed',
+           updated_at = NOW() 
+       WHERE id = $2`,
+      [JSON.stringify(updatedState), id]
+    );
+
+    console.log(`[WORKSPACE] Live status updated to ${is_live}, is_deployed synced, step enforced to 'deployed' for workspace ${id}`);
+
+    res.json({
+      msg: "Live status updated",
+      id,
+      is_live
+    });
+  } catch (err) {
+    console.error("Live Status Update Error:", err);
+    res.status(500).json({ msg: "Server Error", error: err.message });
+  }
+});
+
+/**
+ * @route PUT /api/workspaces/:id
+ * @desc Update workspace name and description
+ * @access Private
+ */
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+
+    // First verify workspace exists and get project_id
+    const wsRes = await pool.resilientQuery(
+      "SELECT project_id FROM workspaces WHERE id = $1",
+      [id]
+    );
+
+    if (wsRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    const projectId = wsRes.rows[0].project_id;
+
+    // Update workspace name and state_json
+    const wsUpdates = [];
+    const wsValues = [];
+    let wsParamIndex = 1;
+
+    if (name) {
+      wsUpdates.push(`name = $${wsParamIndex++}`);
+      wsValues.push(name);
+    }
+
+    if (req.body.state_json) {
+      const stateJson = req.body.state_json;
+      
+      // 🔥 SECURE UPDATE: Encrypt env vars if they are being updated in settings
+      if (stateJson.user_env_vars) {
+        const encryptedEnv = {};
+        const { encrypt } = require('../utils/crypto');
+        for (const [k, v] of Object.entries(stateJson.user_env_vars)) {
+          // Only encrypt if not already encrypted
+          encryptedEnv[k] = (typeof v === 'string' && v.includes(':')) ? v : encrypt(v);
+        }
+        stateJson.user_env_vars = encryptedEnv;
+      }
+      
+      wsUpdates.push(`state_json = $${wsParamIndex++}`);
+      wsValues.push(JSON.stringify(stateJson));
+    }
+
+    if (wsUpdates.length > 0) {
+      wsValues.push(id);
+      await pool.resilientQuery(
+        `UPDATE workspaces SET ${wsUpdates.join(', ')}, updated_at = NOW() WHERE id = $${wsParamIndex}`,
+        wsValues
+      );
+    }
+
+    // Update project name and description
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (name) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+
+    if (description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(description);
+    }
+
+    if (updates.length > 0) {
+      values.push(projectId);
+      await pool.resilientQuery(
+        `UPDATE projects SET ${updates.join(', ')} WHERE id::text = $${paramIndex}::text`,
+        values
+      );
+    }
+
+    res.json({
+      msg: "Workspace updated successfully",
+      id,
+      name,
+      description
+    });
+  } catch (err) {
+    console.error("Update Workspace Error:", err);
+    res.status(500).send("Server Error");
+  }
+});
+
+/**
+ * @route DELETE /api/workspaces/:id
+ * @desc Terminate and delete workspace (and its project container)
+ * @access Private
+ */
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // 1. Verify ownership and get project_id
+    const wsRes = await pool.resilientQuery(
+      "SELECT project_id, user_id FROM workspaces WHERE id = $1",
+      [id]
+    );
+
+    if (wsRes.rows.length === 0) {
+      return res.status(404).json({ msg: "Workspace not found" });
+    }
+
+    const ws = wsRes.rows[0];
+    
+    // Security check: ensure the user owns the workspace
+    const projectRes = await pool.resilientQuery("SELECT owner_id FROM projects WHERE id::text = $1::text", [ws.project_id]);
+    const ownerId = projectRes.rows[0]?.owner_id;
+
+    if (ownerId && ownerId.toString() !== userId.toString()) {
+      return res.status(403).json({ msg: "Unauthorized deletion attempt" });
+    }
+
+    // 2. Delete related data
+    await pool.resilientQuery("DELETE FROM deployments WHERE workspace_id = $1", [id]);
+    await pool.resilientQuery("DELETE FROM cost_feedback WHERE workspace_id = $1", [id]);
+    await pool.resilientQuery("DELETE FROM cost_history WHERE workspace_id = $1", [id]);
+
+    // 3. Delete Workspace
+    await pool.resilientQuery("DELETE FROM workspaces WHERE id = $1", [id]);
+
+    // 4. Delete Project if it has no more workspaces
+    const otherWs = await pool.resilientQuery("SELECT id FROM workspaces WHERE project_id = $1", [ws.project_id]);
+    if (otherWs.rows.length === 0) {
+      await pool.resilientQuery("DELETE FROM projects WHERE id = $1", [ws.project_id]);
+    }
+
+    res.json({ msg: "Workspace Terminated Successfully" });
+  } catch (err) {
+    console.error("Delete Workspace Error:", err);
+    res.status(500).json({ msg: "Server Error", error: err.message });
+  }
+});
+
+module.exports = router;
