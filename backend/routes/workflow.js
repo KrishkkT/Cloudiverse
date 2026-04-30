@@ -3634,7 +3634,7 @@ This configuration uses **local state** (\`terraform.tfstate\`). For team collab
 // Step 6: Trigger Infrastructure Provisioning (Terraform Apply)
 router.post('/deploy/terraform', authMiddleware, async (req, res) => {
     try {
-        const { workspace_id, provider } = req.body;
+        const { workspace_id, provider, requirements: bodyRequirements } = req.body;
         console.log(`[DEPLOY:TF] Starting job for workspace ${workspace_id}`);
 
         // Fetch workspace to get actual services and connection data
@@ -3792,12 +3792,20 @@ router.post('/deploy/terraform', authMiddleware, async (req, res) => {
             const projectName = stateJson.projectData?.name || 'cloudiverse-project';
 
             console.log('[DEPLOY:TF] Generating Terraform files for real execution...');
+            
+            // Re-derive or use passed requirements to ensure NFRs like backup_retention_days are respected
+            const finalRequirements = bodyRequirements || stateJson.requirements || 
+                                     patternResolver.extractRequirements(stateJson.intent?.intent_classification?.project_description || stateJson.projectData?.description || "");
+
             const tfResult = await terraformGenerator.generateTerraform(
                 infraSpec.canonical_architecture,
                 provider,
                 region,
                 projectName,
-                { connectionData }
+                { 
+                    connectionData,
+                    requirements: finalRequirements 
+                }
             );
 
             // DEBUG: Log contents of connectionData before execution

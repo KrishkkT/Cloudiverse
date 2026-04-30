@@ -2456,7 +2456,7 @@ variable "encryption_at_rest" {
 variable "backup_retention_days" {
   description = "Number of days to retain backups"
   type = number
-  default     = 7
+  default     = 1
 }
 
 variable "deletion_protection" {
@@ -2553,7 +2553,7 @@ function generateTfvars(provider, region, projectName, sizing = {}, connectionDa
   const nfr = requirements || {};
   tfvars += `\n# NFR - Driven Configuration\n`;
   tfvars += `encryption_at_rest = ${nfr.security?.encryption_at_rest ?? true}\n`;
-  tfvars += `backup_retention_days = ${nfr.data_retention?.retention_days ?? 1}\n`;
+  tfvars += `backup_retention_days = ${nfr.data_retention?.retention_days ?? nfr.data_retention?.days ?? 1}\n`;
   tfvars += `deletion_protection = ${nfr.data_classes?.deletion_protection ?? true}\n`;
   tfvars += `multi_az = ${nfr.availability?.multi_az ?? false}\n`;
   tfvars += `monitoring_enabled = ${nfr.observability?.monitoring ?? true}\n`;
@@ -3572,7 +3572,7 @@ function getModuleSource(service, provider) {
     private_subnet_ids: 'variable "private_subnet_ids" {\n  type = list(string)\n  default = []\n}',
     public_subnet_ids: 'variable "public_subnet_ids" {\n  type = list(string)\n  default = []\n}',
     encryption_at_rest: 'variable "encryption_at_rest" {\n  type = bool\n  default = true\n}',
-    backup_retention_days: 'variable "backup_retention_days" {\n  type = number\n  default = 7\n}',
+    backup_retention_days: 'variable "backup_retention_days" {\n  type = number\n  default = 1\n}',
     deletion_protection: 'variable "deletion_protection" {\n  type = bool\n  default = true\n}',
     db_password: 'variable "db_password" {\n  type = string\n  sensitive = true\n  default = ""\n}',
     multi_az: 'variable "multi_az" {\n  type = bool\n  default = false\n}',

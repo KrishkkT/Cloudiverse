@@ -965,7 +965,11 @@ async function deployStaticProject(deploymentId, projectDir, workspace, buildCon
                 buildConfig.builder === 'pnpm' ? 'pnpm install' : 'npm install';
         await appendLog(deploymentId, `📦 Installing dependencies (${installCmd})...`);
         try {
-            await execPromise(installCmd, { cwd: projectDir });
+            // Force development mode during install to ensure build tools (vite, etc) are installed
+            await execPromise(installCmd, { 
+                cwd: projectDir,
+                env: { ...process.env, NODE_ENV: 'development' }
+            });
         } catch (e) {
             throw { ...DEPLOY_ERRORS.BUILD_FAILED, details: `Install failed: ${e.message}` };
         }
@@ -1001,8 +1005,26 @@ async function deployStaticProject(deploymentId, projectDir, workspace, buildCon
     if (buildConfig.command) {
         await appendLog(deploymentId, `🔨 Building Static Project (${buildConfig.command})...`);
         try {
+            // Enrich PATH to include local node_modules/.bin for tools like vite, react-scripts
+            const pathSeparator = process.platform === 'win32' ? ';' : ':';
+            const localBin = path.join(projectDir, 'node_modules', '.bin');
+            
+            // Debug: Log if tool exists
+            const toolName = buildConfig.command.includes('vite') ? 'vite' : 
+                            buildConfig.command.includes('react-scripts') ? 'react-scripts' : null;
+            if (toolName) {
+                const toolExists = fs.existsSync(path.join(localBin, toolName));
+                await appendLog(deploymentId, `🔍 Tool check: ${toolName} exists in ${localBin}? ${toolExists}`);
+            }
+
             // Merge with current process env to ensure build tools are in path
-            const buildEnv = { ...process.env, ...buildConfig.envVars };
+            const buildEnv = { 
+                ...process.env, 
+                ...buildConfig.envVars,
+                PATH: `${localBin}${pathSeparator}${process.env.PATH}`,
+                NODE_ENV: 'production' // Ensure production build
+            };
+
             await execPromise(buildConfig.command, { 
                 cwd: projectDir,
                 env: buildEnv
@@ -1201,7 +1223,35 @@ const deployFromGithub = async (deploymentId, workspace, config) => {
         const services = infraSpec.canonical_architecture?.deployable_services || infraSpec.services || [];
 
         const InfrastructureRouter = require('./InfrastructureRouter');
-        const plan = InfrastructureRouter.buildPlan(analysis, workspace.state_json.infra_outputs, services, provider);
+        let plan = InfrastructureRouter.buildPlan(analysis, workspace.state_json.infra_outputs, services, provider);
+
+        // 🛡️ USER OVERRIDES: If user manually configured components in UI, respect them
+        if (config.components && Array.isArray(config.components)) {
+            await appendLog(deploymentId, `🛠️ Applying ${config.components.length} user component overrides...`);
+            plan.components = plan.components.map(comp => {
+                const override = config.components.find(c => c.name === comp.name || c.type === comp.type);
+                if (override) {
+                    return { 
+                        ...comp, 
+                        ...override, 
+                        autoDetected: false,
+                        // Ensure path is absolute if it was relative in the override
+                        path: override.path || comp.path 
+                    };
+                }
+                return comp;
+            });
+
+            // If user added a component that wasn't in the plan, add it
+            config.components.forEach(override => {
+                if (!plan.components.find(c => c.name === override.name)) {
+                    plan.components.push({
+                        ...override,
+                        autoDetected: false
+                    });
+                }
+            });
+        }
 
         await appendLog(deploymentId, `🗺️ Deployment Plan: ${plan.components.length} component(s) mapped to infrastructure`);
         for (const comp of plan.components) {

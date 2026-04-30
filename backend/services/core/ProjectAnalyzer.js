@@ -130,11 +130,11 @@ class ProjectAnalyzer {
              console.log(`[ProjectAnalyzer] 🔀 Mixed indicators found (Backend + Frontend). Analyzing structure...`);
              const structureResult = this.detectStructure(repoPath);
              return {
-                 strategy: 'CONTAINER', // Primary strategy is still CONTAINER
+                 strategy: 'FULLSTACK_SPLIT', // Upgrade to split for better control
                  runtime: 'node',
                  framework: 'mixed-monolith',
-                 builder: 'docker',
-                 structure: structureResult?.structure || null,
+                 builder: 'npm',
+                 structure: structureResult?.structure || { frontend: '.', backend: '.' },
                  reason: 'Detected both frontend and backend indicators in root package.json'
              };
         }

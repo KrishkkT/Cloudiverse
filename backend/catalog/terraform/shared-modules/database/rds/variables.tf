@@ -81,7 +81,7 @@ variable "multi_az" {
 variable "backup_retention_days" {
   description = "Backup retention days"
   type        = number
-  default     = 7
+  default     = 1
 }
 
 variable "tags" {
