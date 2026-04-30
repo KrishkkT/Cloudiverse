@@ -170,16 +170,15 @@ const SHARED_MODULE_SOURCES = {
  */
 const SERVICE_METADATA = {
   // Database
-  // NOTE: Only inject 'region' if the shared module's variables.tf declares it.
-  // Shared modules that do NOT have region: rds, dynamodb, vpc, ecs-fargate, lambda, alb, cognito, ecr, codebuild
-  // Shared modules that DO have region: s3, cdn
+  // NOTE: All shared modules in the catalog (rds, dynamodb, vpc, ecs-fargate, lambda, alb, cognito, ecr, codebuild, s3, cdn) 
+  // now include the 'region' variable for standard alignment across the platform.
   relationaldatabase: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password', 'backup_retention_days', 'multi_az'] },
   relational_db: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password', 'backup_retention_days', 'multi_az'] }, // Alias
   nosqldatabase: { args: [] },
   nosql_db: { args: [] }, // Alias
   analyticaldatabase: { args: [] },
   analytical_db: { args: [] }, // Alias
-  cache: { args: [] },
+  cache: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] },
   vectordatabase: { args: [] },
   vector_db: { args: [] }, // Alias
   datawarehouse: { args: [] },
@@ -2861,16 +2860,11 @@ data "aws_availability_zones" "available" {
       const modulePath = getModulePath(service);
       const sourcePath = `./modules/${modulePath}`;
 
-      mainTf += `module "${moduleName}" {\n  source = "${sourcePath}"\n\n  project_name = var.project_name\n`;
+      mainTf += `module "${moduleName}" {\n  source = "${sourcePath}"\n\n  project_name = var.project_name\n  ${regionLabel} = var.${regionLabel}\n`;
 
       // 🔥 FIX: Inject AWS availability zones for networking
       if (pLower === 'aws' && ['networking', 'vpcnetworking', 'vpc'].includes(service)) {
         mainTf += `  availability_zones = slice(data.aws_availability_zones.available.names, 0, 2)\n`;
-      }
-
-      // Inject region/location ONLY if the module declares it in SERVICE_METADATA args
-      if (meta.args?.includes(regionLabel)) {
-        mainTf += `  ${regionLabel} = var.${regionLabel}\n`;
       }
       if (pLower === 'azure') mainTf += `  resource_group_name = var.resource_group_name\n`;
       if (pLower === 'aws' && ['computeserverless', 'computecontainer', 'appcompute'].includes(service)) {
@@ -4101,7 +4095,9 @@ resource "aws_lb_listener" "http" {
           variables: getRequiredVars('computecontainer', meta.args),
           outputs: `output "app_url" { value = aws_lb.main.dns_name }
 output "ecr_url" { value = aws_ecr_repository.repo.repository_url }
-output "codebuild_name" { value = aws_codebuild_project.build.name } `
+output "codebuild_name" { value = aws_codebuild_project.build.name }
+output "cluster_name" { value = aws_ecs_cluster.main.name }
+output "service_name" { value = aws_ecs_service.app.name } `
         };
 
       case 'computevm':

@@ -3080,6 +3080,20 @@ router.post('/architecture', authMiddleware, async (req, res) => {
             });
         }
 
+        // 🔥 MERGE USER REMOVALS INTO TERMINAL EXCLUSIONS
+        if (req.body.removedServices && Array.isArray(req.body.removedServices)) {
+            const userRemoved = req.body.removedServices.map(s => s.service_name || s.id || s);
+            if (!infraSpec.locked_intent) infraSpec.locked_intent = {};
+            if (!infraSpec.locked_intent.terminal_exclusions) infraSpec.locked_intent.terminal_exclusions = [];
+
+            userRemoved.forEach(svc => {
+                if (!infraSpec.locked_intent.terminal_exclusions.includes(svc)) {
+                    infraSpec.locked_intent.terminal_exclusions.push(svc);
+                }
+            });
+            console.log(`[REMOVAL] Merged ${userRemoved.length} user-removed services for Architecture generation`);
+        }
+
         // Use the pattern resolver to generate architecture based on intent
 
         // Extract requirements from intent
@@ -3124,8 +3138,9 @@ router.post('/architecture', authMiddleware, async (req, res) => {
             canonicalArchitecture = JSON.parse(JSON.stringify(infraSpec.canonical_architecture));
 
             // 🔥 RECONCILIATION: Filter out terminal exclusions from diagram
-            if (infraSpec.terminal_exclusions && infraSpec.terminal_exclusions.length > 0) {
-                console.log(`[RECONCILIATION] Filtering diagram services against ${infraSpec.terminal_exclusions.length} exclusions`);
+            const exclusions = [...(infraSpec.terminal_exclusions || []), ...(infraSpec.locked_intent?.terminal_exclusions || [])];
+            if (exclusions.length > 0) {
+                console.log(`[RECONCILIATION] Filtering diagram services against ${exclusions.length} exclusions`);
                 const deployable = infracostService.extractDeployableServices(infraSpec);
                 
                 // Update deployable services list
@@ -3262,8 +3277,9 @@ router.post('/terraform', authMiddleware, async (req, res) => {
         console.log(`[INVARIANT CHECK] ✓ Step 2 region resolved: ${infraSpec.region?.resolved_region || requirements.region?.primary_region}`);
 
         // 🔥 RECONCILIATION: Ensure terminal exclusions are purged before Terraform generation
-        if (infraSpec.terminal_exclusions && infraSpec.terminal_exclusions.length > 0) {
-            console.log(`[RECONCILIATION] Purging ${infraSpec.terminal_exclusions.length} excluded services from Terraform generation`);
+        const exclusions = [...(infraSpec.terminal_exclusions || []), ...(infraSpec.locked_intent?.terminal_exclusions || [])];
+        if (exclusions.length > 0) {
+            console.log(`[RECONCILIATION] Purging ${exclusions.length} excluded services from Terraform generation`);
             const deployable = infracostService.extractDeployableServices(infraSpec);
             
             if (infraSpec.canonical_architecture) {

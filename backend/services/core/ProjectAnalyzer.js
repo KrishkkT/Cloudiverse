@@ -127,12 +127,14 @@ class ProjectAnalyzer {
         // If we see BOTH frontend and backend indicators in the SAME package.json,
         // it's a monolith that should be containerized.
         if (hasBackend && hasFrontend && !deps['next']) {
-             console.log(`[ProjectAnalyzer] 🔀 Mixed indicators found (Backend + Frontend). Opting for CONTAINER strategy.`);
+             console.log(`[ProjectAnalyzer] 🔀 Mixed indicators found (Backend + Frontend). Analyzing structure...`);
+             const structureResult = this.detectStructure(repoPath);
              return {
-                 strategy: 'CONTAINER',
+                 strategy: 'CONTAINER', // Primary strategy is still CONTAINER
                  runtime: 'node',
                  framework: 'mixed-monolith',
                  builder: 'docker',
+                 structure: structureResult?.structure || null,
                  reason: 'Detected both frontend and backend indicators in root package.json'
              };
         }

@@ -9,6 +9,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region"
+  type        = string
+}
+
 variable "billing_mode" {
   description = "Billing mode (PAY_PER_REQUEST or PROVISIONED)"
   type        = string

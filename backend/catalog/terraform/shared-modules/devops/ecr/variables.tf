@@ -9,6 +9,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region"
+  type        = string
+}
+
 variable "scan_on_push" {
   description = "Enable image scanning on push"
   type        = bool

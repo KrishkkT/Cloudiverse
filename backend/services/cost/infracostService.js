@@ -3744,8 +3744,14 @@ function extractDeployableServices(infraSpec) {
   const list = Array.isArray(rawServices) ? rawServices : [];
   
   // 2. Resolve Terminal Exclusions (Services the user explicitly deleted)
-  const exclusions = infraSpec.terminal_exclusions || [];
-  const normalizedExclusions = exclusions.map(e => resolveServiceId(e.toLowerCase()));
+  const exclusions = [
+    ...(infraSpec.terminal_exclusions || []),
+    ...(infraSpec.locked_intent?.terminal_exclusions || [])
+  ];
+  const normalizedExclusions = exclusions.map(e => {
+    const str = typeof e === 'string' ? e : (e.service_name || e.id || e.service_class || e.name || '');
+    return resolveServiceId(str.toLowerCase());
+  }).filter(Boolean);
 
   console.log(`[DEPLOYABLE] Extracting from ${list.length} raw services. Exclusions: ${normalizedExclusions.join(', ')}`);
 

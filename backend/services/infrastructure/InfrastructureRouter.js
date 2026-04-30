@@ -318,7 +318,42 @@ class InfrastructureRouter {
         }
         // CONTAINER project (Node API, Java, Python, etc.)
         else if (analysis.strategy === 'CONTAINER') {
-            if (provisioned.hasContainerCompute) {
+            // Mixed Monolith Split Support: If we have BOTH and it's a mixed-monolith with structure
+            if (analysis.framework === 'mixed-monolith' && analysis.structure && provisioned.hasStaticHosting && provisioned.hasContainerCompute) {
+                components.push({
+                    name: 'frontend',
+                    type: 'static',
+                    target: 'static',
+                    service: this.getServiceLabel('static', provider),
+                    path: analysis.structure.frontend || '.',
+                    buildCommand: 'npm run build',
+                    outputDir: 'dist',
+                    deployTo: {
+                        bucket: provisioned.bucketName,
+                        cdn: provisioned.cdnEndpoint,
+                        cdnId: provisioned.cdnDistributionId
+                    },
+                    autoDetected: true,
+                    note: 'Split mixed-monolith frontend to static hosting'
+                });
+
+                components.push({
+                    name: 'backend',
+                    type: 'container',
+                    target: 'container',
+                    service: this.getServiceLabel('container', provider),
+                    path: analysis.structure.backend || '.',
+                    runtime: analysis.runtime || 'node',
+                    deployTo: {
+                        cluster: provisioned.ecsClusterName,
+                        service: provisioned.ecsServiceName,
+                        registry: provisioned.ecrRepoUrl,
+                        loadBalancer: provisioned.loadBalancerDns
+                    },
+                    autoDetected: true,
+                    note: 'Split mixed-monolith backend to container'
+                });
+            } else if (provisioned.hasContainerCompute) {
                 components.push({
                     name: 'application',
                     type: 'container',
@@ -348,6 +383,21 @@ class InfrastructureRouter {
                         apiEndpoint: provisioned.apiGatewayEndpoint
                     },
                     autoDetected: true
+                });
+            } else if (provisioned.hasStaticHosting) {
+                // Fallback: no container compute, serve as static site (if framework allows)
+                components.push({
+                    name: 'application',
+                    type: 'static',
+                    target: 'static',
+                    service: this.getServiceLabel('static', provider),
+                    path: '.',
+                    autoDetected: false,
+                    note: 'No container compute provisioned — trying static hosting fallback',
+                    deployTo: {
+                        bucket: provisioned.bucketName,
+                        cdn: provisioned.cdnEndpoint
+                    }
                 });
             }
         }

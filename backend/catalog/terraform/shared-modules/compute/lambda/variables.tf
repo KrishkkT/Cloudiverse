@@ -9,6 +9,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region"
+  type        = string
+}
+
 variable "execution_role_arn" {
   description = "Execution role ARN from Landing Zone"
   type        = string

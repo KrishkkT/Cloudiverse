@@ -9,6 +9,11 @@ variable "project_name" {
   type        = string
 }
 
+variable "region" {
+  description = "AWS region"
+  type        = string
+}
+
 variable "allow_admin_create_user_only" {
   description = "Whether to allow admin to create users only"
   type        = bool
