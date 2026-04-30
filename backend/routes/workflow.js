@@ -3274,7 +3274,21 @@ router.post('/terraform', authMiddleware, async (req, res) => {
         }
 
         console.log(`[INVARIANT CHECK] ✓ Step 3 completed: sizing.tier=${infraSpec.sizing.tier}`);
-        console.log(`[INVARIANT CHECK] ✓ Step 2 region resolved: ${infraSpec.region?.resolved_region || requirements.region?.primary_region}`);
+        console.log(`[INVARIANT CHECK] ✓ Step 2 region resolved: ${infraSpec.region?.resolved_region || (requirements && requirements.region?.primary_region)}`);
+        
+        // 🔥 MERGE USER REMOVALS INTO TERMINAL EXCLUSIONS
+        if (req.body.removedServices && Array.isArray(req.body.removedServices)) {
+            const userRemoved = req.body.removedServices.map(s => s.service_name || s.id || s);
+            if (!infraSpec.locked_intent) infraSpec.locked_intent = {};
+            if (!infraSpec.locked_intent.terminal_exclusions) infraSpec.locked_intent.terminal_exclusions = [];
+
+            userRemoved.forEach(svc => {
+                if (!infraSpec.locked_intent.terminal_exclusions.includes(svc)) {
+                    infraSpec.locked_intent.terminal_exclusions.push(svc);
+                }
+            });
+            console.log(`[REMOVAL] Merged ${userRemoved.length} user-removed services into terminal exclusions for Terraform`);
+        }
 
         // 🔥 RECONCILIATION: Ensure terminal exclusions are purged before Terraform generation
         const exclusions = [...(infraSpec.terminal_exclusions || []), ...(infraSpec.locked_intent?.terminal_exclusions || [])];
@@ -3370,7 +3384,11 @@ router.post('/terraform', authMiddleware, async (req, res) => {
                 infraSpec.canonical_architecture,
                 provider,
                 infraSpec.region?.resolved_region || 'ap-south-1',
-                project_name || 'cloudiverse-project'
+                project_name || 'cloudiverse-project',
+                {
+                    requirements: requirements,
+                    connectionData: req.body.connectionData // Pass if available
+                }
             );
 
             console.log('[TERRAFORM] Project generated successfully');

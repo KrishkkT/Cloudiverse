@@ -265,6 +265,43 @@ class ProjectAnalyzer {
             };
         }
 
+        // Exhaustive search for sub-packages
+        const allDirs = fs.readdirSync(repoPath).filter(f => {
+            try { return fs.statSync(path.join(repoPath, f)).isDirectory() && !f.startsWith('.') && f !== 'node_modules'; } 
+            catch { return false; }
+        });
+
+        let foundFrontend = hasClient;
+        let foundBackend = hasServer;
+
+        if (!foundFrontend || !foundBackend) {
+            for (const d of allDirs) {
+                const subPkgPath = path.join(repoPath, d, 'package.json');
+                if (fs.existsSync(subPkgPath)) {
+                    try {
+                        const subPkg = JSON.parse(fs.readFileSync(subPkgPath, 'utf8'));
+                        const subDeps = { ...(subPkg.dependencies || {}), ...(subPkg.devDependencies || {}) };
+                        const isFE = ['vite', 'react', 'vue', 'svelte', 'next', 'astro'].some(f => subDeps[f]);
+                        const isBE = ['express', 'fastify', 'nestjs', 'koa', 'mongoose', 'pg'].some(f => subDeps[f]);
+                        
+                        if (isFE && !foundFrontend) foundFrontend = d;
+                        if (isBE && !foundBackend) foundBackend = d;
+                    } catch (e) {}
+                }
+            }
+        }
+
+        if (foundFrontend || foundBackend) {
+            return {
+                strategy: (foundFrontend && foundBackend) ? 'FULLSTACK_SPLIT' : 'MONOLITH',
+                structure: {
+                    frontend: foundFrontend,
+                    backend: foundBackend
+                },
+                reason: `Detected structure: FE=${foundFrontend}, BE=${foundBackend}`
+            };
+        }
+
         // Check 'apps' folder (Monorepo standard)
         if (dirs.includes('apps')) {
              const appsPath = path.join(repoPath, 'apps');

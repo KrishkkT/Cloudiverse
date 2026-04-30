@@ -176,15 +176,15 @@ const SERVICE_METADATA = {
   relational_db: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password', 'backup_retention_days', 'multi_az'] }, // Alias
   nosqldatabase: { args: [] },
   nosql_db: { args: [] }, // Alias
-  analyticaldatabase: { args: [] },
-  analytical_db: { args: [] }, // Alias
+  analyticaldatabase: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password'] },
+  analytical_db: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password'] }, // Alias
   cache: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] },
-  vectordatabase: { args: [] },
-  vector_db: { args: [] }, // Alias
-  datawarehouse: { args: [] },
-  data_warehouse: { args: [] }, // Alias
-  searchengine: { args: [] },
-  search: { args: [] }, // Alias
+  vectordatabase: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] },
+  vector_db: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] }, // Alias
+  datawarehouse: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password'] },
+  data_warehouse: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'db_password'] }, // Alias
+  searchengine: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] },
+  search: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] }, // Alias
   timeseriesdatabase: { args: [] },
   timeseries_db: { args: [] }, // Alias
 
@@ -247,7 +247,7 @@ const SERVICE_METADATA = {
   networking: { args: ['availability_zones'] },
   vpc: { args: ['availability_zones'] },
   vpcnetworking: { args: ['availability_zones'] },
-  graphdatabase: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids', 'region', 'location'] },
+  graphdatabase: { deps: ['networking'], args: ['vpc_id', 'private_subnet_ids'] },
   identityauth: { args: [] },  // cognito shared module does NOT accept region
   auth: { args: [] },
 
@@ -2497,7 +2497,7 @@ variable "db_password" {
 /**
  * Generate terraform.tfvars from workspace defaults
  */
-function generateTfvars(provider, region, projectName, sizing = {}, connectionData = {}) {
+function generateTfvars(provider, region, projectName, sizing = {}, connectionData = {}, requirements = {}) {
   // const region resolved from arg
 
 
@@ -2549,14 +2549,14 @@ function generateTfvars(provider, region, projectName, sizing = {}, connectionDa
     if (sizing.requests_per_month) tfvars += `estimated_requests = ${sizing.requests_per_month} \n`;
   }
 
-  // NFR-driven values (Defaults since requirements obj is not available in V2 generator yet)
-  const nfr = {};
+  // NFR-driven values
+  const nfr = requirements || {};
   tfvars += `\n# NFR - Driven Configuration\n`;
-  tfvars += `encryption_at_rest = true\n`;
-  tfvars += `backup_retention_days = 7\n`;
-  tfvars += `deletion_protection = true\n`;
-  tfvars += `multi_az = false\n`;
-  tfvars += `monitoring_enabled = true\n`;
+  tfvars += `encryption_at_rest = ${nfr.security?.encryption_at_rest ?? true}\n`;
+  tfvars += `backup_retention_days = ${nfr.data_retention?.retention_days ?? 1}\n`;
+  tfvars += `deletion_protection = ${nfr.data_classes?.deletion_protection ?? true}\n`;
+  tfvars += `multi_az = ${nfr.availability?.multi_az ?? false}\n`;
+  tfvars += `monitoring_enabled = ${nfr.observability?.monitoring ?? true}\n`;
 
   return tfvars;
 }
@@ -3494,7 +3494,7 @@ async function generateTerraform(canonicalArchitecture, provider, region, projec
   files['versions.tf'] = generateVersionsTf(providerLower, region, projectName);
   files['providers.tf'] = generateProvidersTf(providerLower, region);
   files['variables.tf'] = generateVariablesTf(providerLower, pattern, deployableServices);
-  files['terraform.tfvars'] = generateTfvars(providerLower, region, projectName, canonicalArchitecture.sizing || {}, options.connectionData);
+  files['terraform.tfvars'] = generateTfvars(providerLower, region, projectName, canonicalArchitecture.sizing || {}, options.connectionData, options.requirements);
   files['outputs.tf'] = generateOutputsTf(providerLower, pattern, deployableServices);
   files['main.tf'] = generateMainTf(providerLower, pattern, deployableServices);
   files['README.md'] = generateReadme(projectName, providerLower, pattern, deployableServices);
@@ -4291,7 +4291,7 @@ resource "aws_security_group" "neptune_sg" {
         cidr_blocks = ["10.0.0.0/16"]
       }
     } `,
-          variables: getRequiredVars('nosqldatabase', meta.args),
+          variables: getRequiredVars('graphdatabase', meta.args),
           outputs: `output "endpoint" { value = aws_neptune_cluster.main.endpoint } `
         };
 

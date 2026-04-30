@@ -391,7 +391,7 @@ class InfrastructureRouter {
                     type: 'static',
                     target: 'static',
                     service: this.getServiceLabel('static', provider),
-                    path: '.',
+                    path: (analysis.structure && analysis.structure.frontend) || '.',
                     autoDetected: false,
                     note: 'No container compute provisioned — trying static hosting fallback',
                     deployTo: {
