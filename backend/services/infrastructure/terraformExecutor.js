@@ -21,6 +21,8 @@ const TERRAFORM_BIN = (() => {
     
     const fsSync = require('fs');
     const locations = [
+        path.join(__dirname, '../../terraform_bin/terraform'),
+        path.join(process.cwd(), 'terraform_bin/terraform'),
         path.join(__dirname, '../../terraform_bin'),
         path.join(process.cwd(), 'terraform_bin'),
         '/opt/render/project/src/terraform_bin',
@@ -29,7 +31,14 @@ const TERRAFORM_BIN = (() => {
 
     for (const loc of locations) {
         try {
-            if (fsSync.existsSync(loc)) return loc;
+            if (fsSync.existsSync(loc)) {
+                const stats = fsSync.statSync(loc);
+                if (stats.isFile()) return loc;
+                if (stats.isDirectory()) {
+                    const binPath = path.join(loc, 'terraform');
+                    if (fsSync.existsSync(binPath)) return binPath;
+                }
+            }
         } catch (e) { /* ignore */ }
     }
 
