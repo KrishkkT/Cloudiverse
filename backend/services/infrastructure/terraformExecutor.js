@@ -18,11 +18,21 @@ const TERRAFORM_WORK_DIR = path.join(os.tmpdir(), 'cloudiverse-tf');
 // 3. System PATH (local dev / standard install)
 const TERRAFORM_BIN = (() => {
     if (process.env.TERRAFORM_BIN) return process.env.TERRAFORM_BIN;
-    const renderPath = path.join(__dirname, '../../terraform_bin');
-    try {
-        const fsSync = require('fs');
-        if (fsSync.existsSync(renderPath)) return renderPath;
-    } catch (e) { /* ignore */ }
+    
+    const fsSync = require('fs');
+    const locations = [
+        path.join(__dirname, '../../terraform_bin'),
+        path.join(process.cwd(), 'terraform_bin'),
+        '/opt/render/project/src/terraform_bin',
+        '/opt/render/project/src/backend/terraform_bin'
+    ];
+
+    for (const loc of locations) {
+        try {
+            if (fsSync.existsSync(loc)) return loc;
+        } catch (e) { /* ignore */ }
+    }
+
     return 'terraform'; // fallback to system PATH
 })();
 console.log(`[TERRAFORM] Binary path resolved: ${TERRAFORM_BIN}`);
@@ -583,6 +593,9 @@ class TerraformExecutor {
             }
 
             if (!initResult.success) {
+                if (initResult.exitCode === 127) {
+                    throw new Error(`Terraform binary NOT found. Resolved path: "${TERRAFORM_BIN}". Please ensure Terraform is installed correctly in the production environment.`);
+                }
                 const ipv6Advice = os.platform() === 'win32' ? ' On Windows, this often indicates an IPv6 conflict — try disabling IPv6 on your network adapter.' : '';
                 throw new Error(`Terraform init failed after ${maxRetries} attempts (exit code ${initResult.exitCode}). This is likely a network issue (connection reset).${ipv6Advice} Check your internet connection or try again.`);
             }

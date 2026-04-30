@@ -317,6 +317,18 @@ pool.query('SELECT NOW()', async (err, res) => {
 
 // Middleware
 app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.cloudiverse.app", "https://checkout.razorpay.com", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://cdn-cgi.cloudflare.com"],
+      connectSrc: ["'self'", "https://www.cloudiverse.app", "https://api.cloudiverse.app", "https://lumberjack.razorpay.com", "https://checkout.razorpay.com", "https://www.google-analytics.com", "https://stats.g.doubleclick.net"],
+      frameSrc: ["'self'", "https://checkout.razorpay.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://checkout.razorpay.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      upgradeInsecureRequests: [],
+    },
+  },
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
 }));
