@@ -1997,9 +1997,14 @@ async function runInfracost(terraformDir, usageFilePath = null, skipValidation =
       '--log-level', 'warn'
     ];
 
+    // HCL parsing is typically default in recent versions, and the explicit flag 
+    // may cause 'unknown flag' errors on some CLI versions (e.g. v0.10.43).
+    /* 
     if (useHclParsing) {
       args.push('--terraform-parse-hcl');
     }
+    */
+
 
     if (usageFilePath && fs.existsSync(usageFilePath)) {
       args.push('--usage-file', usageFilePath);
@@ -3915,6 +3920,7 @@ module.exports = {
   identifyMissingComponents,
   PROVIDER_PERFORMANCE_SCORES,
   calculateScenarios,
+  extractDeployableServices, // Exported for reuse in workflow routes
   generateFullProjectExport, // NEW Export
   // Exposed for testing
   // generateGCPTerraform,

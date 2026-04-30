@@ -116,93 +116,24 @@ class ProjectAnalyzer {
         const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
         const scripts = pkg.scripts || {};
 
-        // A. Next.js Check (Most Complex)
-        if (deps['next']) {
-            // Check next.config.js for "output: export"
-            let isStatic = false;
-            const nextConfigPath = path.join(repoPath, 'next.config.js');
-            const nextConfigMjsPath = path.join(repoPath, 'next.config.mjs');
-            
-            // Heuristic check for 'output: "export"' or "export"
-            // (Robust parsing would require AST, but grep is fast/effective for now)
-            try {
-                if (fs.existsSync(nextConfigPath)) {
-                    const content = fs.readFileSync(nextConfigPath, 'utf8');
-                    if (content.includes(`output: 'export'`) || content.includes(`output: "export"`)) isStatic = true;
-                } else if (fs.existsSync(nextConfigMjsPath)) { // Check MJS as well
-                     const content = fs.readFileSync(nextConfigMjsPath, 'utf8');
-                     if (content.includes(`output: 'export'`) || content.includes(`output: "export"`)) isStatic = true;
-                }
-            } catch (e) { /* ignore read error */ }
-
-            // Check script "next export" (Older Next.js)
-            if (scripts.build && scripts.build.includes('next export')) isStatic = true;
-            if (scripts.export) isStatic = true;
-
-            if (isStatic) {
-                return {
-                    strategy: 'STATIC',
-                    runtime: 'node', // Build time only
-                    framework: 'next',
-                    builder: 'npm',
-                    buildCommand: 'npm run build',
-                    outputDir: 'out', // Standard Next.js export dir
-                    reason: 'Next.js with static export detected'
-                };
-            } else {
-                return {
-                    strategy: 'CONTAINER',
-                    runtime: 'node',
-                    framework: 'next',
-                    builder: 'docker', // We will generate Dockerfile
-                    reason: 'Next.js SSR detected (default)'
-                };
-            }
-        }
-
-        // B. Static Frameworks (Vite, React, Vue, etc.)
-        // These produce static assets.
-        const staticIndicators = [
-            { id: 'vite', check: d => d['vite'], out: 'dist' },
-            { id: 'react-scripts', check: d => d['react-scripts'], out: 'build' },
-            { id: 'gatsby', check: d => d['gatsby'], out: 'public' },
-            { id: 'astro', check: d => d['astro'], out: 'dist' },
-            { id: 'nuxt', check: d => d['nuxt'], out: '.output/public' }, // Nuxt can be SSR too, check config? assume static validation later?
-            // Note: Nuxt is often SSR. Let's treat Nuxt like Next.js later. For now, Nuxt logic usually implies server unless 'target: static'.
-            // Keeping simple for MVP as requested.
-        ];
-
-        for (const ind of staticIndicators) {
-            if (ind.check(deps)) {
-                // Special handling for Nuxt to be safe? 
-                // Let's stick to User's "React/Vite = STATIC" rule.
-                return {
-                    strategy: 'STATIC',
-                    runtime: 'node',
-                    framework: ind.id,
-                    builder: 'npm',
-                    buildCommand: 'npm run build',
-                    outputDir: ind.out,
-                    reason: `Matched static framework: ${ind.id}`
-                };
-            }
-        }
-
-        // C. Backend API Frameworks
-        const backendIndicators = ['express', 'fastify', 'nestjs', '@nestjs/core', 'koa', 'hapi'];
-        const hasBackend = backendIndicators.some(f => deps[f]);
+        // 1. Identify Indicators
+        const backendIndicators = ['express', 'fastify', 'nestjs', '@nestjs/core', 'koa', 'hapi', 'nodemailer', 'pg', 'mongoose', 'redis', 'socket.io'];
+        const frontendIndicators = ['react', 'vue', 'svelte', 'vite', 'react-scripts', 'gatsby', 'astro', 'next'];
         
-        // D. Check for Monorepo / Fullstack Split Signals
-        // If we see BOTH frontend (react) AND backend (express) deps in root, 
-        // OR we see "workspaces" in package.json
-        const hasFrontend = deps['react'] || deps['vue'] || deps['svelte'];
+        const hasBackend = backendIndicators.some(f => deps[f]);
+        const hasFrontend = frontendIndicators.some(f => deps[f]);
 
-        if (hasBackend && hasFrontend) {
+        // B. Mixed / Fullstack Check (Early Exit)
+        // If we see BOTH frontend and backend indicators in the SAME package.json,
+        // it's a monolith that should be containerized.
+        if (hasBackend && hasFrontend && !deps['next']) {
+             console.log(`[ProjectAnalyzer] 🔀 Mixed indicators found (Backend + Frontend). Opting for CONTAINER strategy.`);
              return {
-                 strategy: 'FULLSTACK_SPLIT', // Tentative, needs Layer 3 confirmation
+                 strategy: 'CONTAINER',
                  runtime: 'node',
-                 framework: 'mixed',
-                 reason: 'Detected both frontend and backend dependencies in root'
+                 framework: 'mixed-monolith',
+                 builder: 'docker',
+                 reason: 'Detected both frontend and backend indicators in root package.json'
              };
         }
 
@@ -215,11 +146,77 @@ class ProjectAnalyzer {
              };
         }
 
+        // C. Next.js Check (Most Complex)
+        // C. Next.js Check (Most Complex)
+        if (deps['next']) {
+            // Check next.config.js for "output: export"
+            let isStatic = false;
+            const nextConfigPath = path.join(repoPath, 'next.config.js');
+            const nextConfigMjsPath = path.join(repoPath, 'next.config.mjs');
+            
+            try {
+                if (fs.existsSync(nextConfigPath)) {
+                    const content = fs.readFileSync(nextConfigPath, 'utf8');
+                    if (content.includes(`output: 'export'`) || content.includes(`output: "export"`)) isStatic = true;
+                } else if (fs.existsSync(nextConfigMjsPath)) {
+                     const content = fs.readFileSync(nextConfigMjsPath, 'utf8');
+                     if (content.includes(`output: 'export'`) || content.includes(`output: "export"`)) isStatic = true;
+                }
+            } catch (e) { /* ignore */ }
+
+            if (scripts.build && scripts.build.includes('next export')) isStatic = true;
+            if (scripts.export) isStatic = true;
+
+            if (isStatic) {
+                return {
+                    strategy: 'STATIC',
+                    runtime: 'node',
+                    framework: 'next',
+                    builder: 'npm',
+                    buildCommand: 'npm run build',
+                    outputDir: 'out',
+                    reason: 'Next.js with static export detected'
+                };
+            } else {
+                return {
+                    strategy: 'CONTAINER',
+                    runtime: 'node',
+                    framework: 'next',
+                    builder: 'docker',
+                    reason: 'Next.js SSR detected (default)'
+                };
+            }
+        }
+
+        // D. Static Frameworks (Vite, React, Vue, etc.)
+        const staticIndicators = [
+            { id: 'vite', check: d => d['vite'], out: 'dist' },
+            { id: 'react-scripts', check: d => d['react-scripts'], out: 'build' },
+            { id: 'gatsby', check: d => d['gatsby'], out: 'public' },
+            { id: 'astro', check: d => d['astro'], out: 'dist' },
+            { id: 'nuxt', check: d => d['nuxt'], out: '.output/public' },
+        ];
+
+        for (const ind of staticIndicators) {
+            if (ind.check(deps)) {
+                return {
+                    strategy: 'STATIC',
+                    runtime: 'node',
+                    framework: ind.id,
+                    builder: 'npm',
+                    buildCommand: 'npm run build',
+                    outputDir: ind.out,
+                    reason: `Matched static framework: ${ind.id}`
+                };
+            }
+        }
+
+        // E. Backend API Frameworks
         if (hasBackend) {
             return {
                 strategy: 'CONTAINER',
                 runtime: 'node',
-                framework: 'express-like', // Generic node server
+                framework: 'express-like',
                 builder: 'docker',
                 reason: 'Backend framework detected'
             };

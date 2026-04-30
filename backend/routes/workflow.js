@@ -3120,7 +3120,26 @@ router.post('/architecture', authMiddleware, async (req, res) => {
         if (infraSpec.canonical_architecture) {
             // Use the stored canonical architecture from Step 2
             console.log('[FIX 1] Using stored canonical architecture from Step 2');
-            canonicalArchitecture = infraSpec.canonical_architecture;
+            // Clone to avoid mutating the original spec in state
+            canonicalArchitecture = JSON.parse(JSON.stringify(infraSpec.canonical_architecture));
+
+            // 🔥 RECONCILIATION: Filter out terminal exclusions from diagram
+            if (infraSpec.terminal_exclusions && infraSpec.terminal_exclusions.length > 0) {
+                console.log(`[RECONCILIATION] Filtering diagram services against ${infraSpec.terminal_exclusions.length} exclusions`);
+                const deployable = infracostService.extractDeployableServices(infraSpec);
+                
+                // Update deployable services list
+                canonicalArchitecture.deployable_services = deployable;
+                
+                // Update rich services metadata list for diagram nodes
+                if (canonicalArchitecture.services) {
+                    const deployableSet = new Set(deployable);
+                    canonicalArchitecture.services = canonicalArchitecture.services.filter(s => {
+                        const id = s.service_id || s.service_class || s.service || s.name || s.canonical_type;
+                        return deployableSet.has(id);
+                    });
+                }
+            }
         } else {
             // Fallback: reconstruct from infraSpec services (legacy compatibility or diagram data recovery)
             console.warn('[FIX 1] No stored canonical architecture - reconstructing from infraSpec');
@@ -3241,6 +3260,24 @@ router.post('/terraform', authMiddleware, async (req, res) => {
 
         console.log(`[INVARIANT CHECK] ✓ Step 3 completed: sizing.tier=${infraSpec.sizing.tier}`);
         console.log(`[INVARIANT CHECK] ✓ Step 2 region resolved: ${infraSpec.region?.resolved_region || requirements.region?.primary_region}`);
+
+        // 🔥 RECONCILIATION: Ensure terminal exclusions are purged before Terraform generation
+        if (infraSpec.terminal_exclusions && infraSpec.terminal_exclusions.length > 0) {
+            console.log(`[RECONCILIATION] Purging ${infraSpec.terminal_exclusions.length} excluded services from Terraform generation`);
+            const deployable = infracostService.extractDeployableServices(infraSpec);
+            
+            if (infraSpec.canonical_architecture) {
+                infraSpec.canonical_architecture.deployable_services = deployable;
+                
+                if (infraSpec.canonical_architecture.services) {
+                    const deployableSet = new Set(deployable);
+                    infraSpec.canonical_architecture.services = infraSpec.canonical_architecture.services.filter(s => {
+                        const id = s.service_id || s.service_class || s.service || s.name || s.canonical_type;
+                        return deployableSet.has(id);
+                    });
+                }
+            }
+        }
 
         console.log(`[TERRAFORM] InfraSpec:`, JSON.stringify(infraSpec, null, 2));
         console.log(`[TERRAFORM] InfraSpec pattern:`, infraSpec?.architecture_pattern || infraSpec?.canonical_architecture?.pattern);

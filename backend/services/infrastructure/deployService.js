@@ -1008,7 +1008,8 @@ async function deployStaticProject(deploymentId, projectDir, workspace, buildCon
                 env: buildEnv
             });
         } catch (e) {
-            throw { ...DEPLOY_ERRORS.BUILD_FAILED, details: e.message };
+            const errorDetails = e.stderr || e.stdout || e.message;
+            throw { ...DEPLOY_ERRORS.BUILD_FAILED, details: errorDetails };
         }
     }
 
@@ -1376,7 +1377,8 @@ const deployFromGithub = async (deploymentId, workspace, config) => {
 
     } catch (err) {
         console.error("Github Deploy Error:", err);
-        await updateDeploymentStatus(deploymentId, 'failed', null, [{ message: `Error: ${err.message}` }]);
+        const errorMsg = err.details ? `${err.message}: ${err.details}` : err.message;
+        await updateDeploymentStatus(deploymentId, 'failed', null, [{ message: `❌ Error: ${errorMsg}` }]);
     }
 };
 
