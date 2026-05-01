@@ -15,14 +15,19 @@ const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 router.get('/connect', auth, (req, res) => {
     const scope = 'repo,user,read:org';
     
-    // 🔥 DYNAMIC URL: Use req.get('host') to support both localhost and cloudiverse.app
+    // 1. Determine the base URL dynamically
     const host = req.get('host');
-    const protocol = req.protocol; // Works because of trust proxy in server.js
-    // Support GITHUB_REDIRECT_URI from .env for production/specific setups
+    const protocol = req.protocol;
+    
+    // 2. Prioritize GITHUB_REDIRECT_URI if set, otherwise use the dynamic host
     const redirectUri = process.env.GITHUB_REDIRECT_URI || `${protocol}://${host}/api/github/callback`;
+    
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=${scope}&state=${req.user.id}&redirect_uri=${encodeURIComponent(redirectUri)}`;
     
-    console.log(`[GITHUB] Initiating OAuth for user ${req.user.id}, redirectUri: ${redirectUri}`);
+    console.log(`[GITHUB] Initiating OAuth for user ${req.user.id}`);
+    console.log(`[GITHUB] Host Detected: ${host}, Protocol: ${protocol}`);
+    console.log(`[GITHUB] Final Redirect URI: ${redirectUri}`);
+    
     res.redirect(authUrl);
 });
 
@@ -40,10 +45,15 @@ router.get('/callback', async (req, res) => {
 
     try {
         // 1. Exchange code for access token
+        const host = req.get('host');
+        const protocol = req.protocol;
+        const redirectUri = process.env.GITHUB_REDIRECT_URI || `${protocol}://${host}/api/github/callback`;
+
         const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
             code,
+            redirect_uri: redirectUri
         }, {
             headers: { Accept: 'application/json' }
         });
