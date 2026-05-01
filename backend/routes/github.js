@@ -18,9 +18,8 @@ router.get('/connect', auth, (req, res) => {
     // 🔥 DYNAMIC URL: Use req.get('host') to support both localhost and cloudiverse.app
     const host = req.get('host');
     const protocol = req.protocol; // Works because of trust proxy in server.js
-    const baseUrl = `${protocol}://${host}`;
-    
-    const redirectUri = `${baseUrl}/api/github/callback`;
+    // Support GITHUB_REDIRECT_URI from .env for production/specific setups
+    const redirectUri = process.env.GITHUB_REDIRECT_URI || `${protocol}://${host}/api/github/callback`;
     const authUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=${scope}&state=${req.user.id}&redirect_uri=${encodeURIComponent(redirectUri)}`;
     
     console.log(`[GITHUB] Initiating OAuth for user ${req.user.id}, redirectUri: ${redirectUri}`);
