@@ -163,7 +163,7 @@ router.get('/account', auth, async (req, res) => {
         );
 
         if (rows.length === 0 || !rows[0].account_name) {
-            return res.status(404).json({ message: "No GitHub connection found." });
+            return res.status(404).json({ message: "No GitHub connection found. Please connect your account first." });
         }
 
         res.json(rows[0]);
@@ -181,7 +181,7 @@ router.get('/repos', auth, async (req, res) => {
     try {
         const token = await getValidToken(req.user.id);
         if (!token) {
-            return res.status(404).json({ message: "No GitHub connection found." });
+            return res.status(404).json({ message: "No GitHub connection found. Please connect your account first." });
         }
 
         const repos = await githubService.getRepositories(token);
