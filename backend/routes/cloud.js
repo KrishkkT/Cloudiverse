@@ -18,14 +18,23 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 // Azure MSAL Setup
-const msalConfig = {
-    auth: {
-        clientId: process.env.AZURE_CLIENT_ID,
-        authority: "https://login.microsoftonline.com/common",
-        clientSecret: process.env.AZURE_CLIENT_SECRET,
+let cca = null;
+if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET) {
+    const msalConfig = {
+        auth: {
+            clientId: process.env.AZURE_CLIENT_ID,
+            authority: "https://login.microsoftonline.com/common",
+            clientSecret: process.env.AZURE_CLIENT_SECRET,
+        }
+    };
+    try {
+        cca = new msal.ConfidentialClientApplication(msalConfig);
+    } catch (err) {
+        console.error("Failed to initialize MSAL ConfidentialClientApplication:", err.message);
     }
-};
-const cca = new msal.ConfidentialClientApplication(msalConfig);
+} else {
+    console.warn("WARNING: Azure MSAL credentials (AZURE_CLIENT_ID/AZURE_CLIENT_SECRET) are missing. MSAL ConfidentialClientApplication will not be initialized.");
+}
 
 
 
@@ -671,6 +680,9 @@ router.post('/:provider/connect', authMiddleware, async (req, res) => {
                 prompt: 'select_account',
                 authority: authority
             };
+            if (!cca) {
+                throw new Error("Azure MSAL provider is not configured on this server (missing AZURE_CLIENT_ID or AZURE_CLIENT_SECRET).");
+            }
             authUrl = await cca.getAuthCodeUrl(authCodeUrlParameters);
             console.log(`[AZURE] Generated Auth URL for Authority: ${authority}`);
         }
@@ -728,6 +740,10 @@ router.get('/:provider/callback', async (req, res) => {
         }
         if (provider === 'azure') {
             const { encrypt } = require('../services/shared/encryptionService');
+
+            if (!cca) {
+                throw new Error("Azure MSAL provider is not configured on this server (missing AZURE_CLIENT_ID or AZURE_CLIENT_SECRET).");
+            }
 
             if (req.query.admin_consent === 'True' || req.query.admin_consent === 'true') {
                 console.log("[AZURE_AUTO] Admin Consent Granted. Re-initiating login...");

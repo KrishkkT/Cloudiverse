@@ -1,0 +1,101 @@
+name: Cloudiverse Deploy CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend to ECS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Backend Image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: cloudiverse-backend
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Download Current ECS Task Definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition cloudiverse-backend \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Update Task Definition with New Image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: backend
+          image: ${{ steps.login-ecr.outputs.registry }}/cloudiverse-backend:latest
+
+      - name: Deploy to ECS Service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: cloudiverse-backend-service
+          cluster: cloudiverse-prod
+          wait-for-service-stability: true
+
+  deploy-frontend:
+    name: Deploy Frontend to S3 & CloudFront
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        env:
+          VITE_API_BASE_URL: https://www.cloudiverse.app
+          VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA # Replace in GitHub secrets if different
+          VITE_GOOGLE_CLIENT_ID: 788671667486-ndqdio7n6euv09bglrsm5h9v2ri6lbgu.apps.googleusercontent.com
+        run: npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Deploy to S3 Bucket
+        working-directory: ./frontend
+        run: |
+          aws s3 sync dist/ s3://cloudiverse-frontend --delete
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E1YMQWMFOZXK8B \
+            --paths "/*"
