@@ -1,22 +1,76 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function CaptchaGate({ onVerified }) {
     const [rayId] = useState(() => Math.random().toString(36).substring(2, 11).toUpperCase() + Math.random().toString(36).substring(2, 8).toUpperCase());
+    const containerRef = useRef(null);
+    const widgetIdRef = useRef(null);
 
     useEffect(() => {
+        let isMounted = true;
+
+        // Callback Cloudflare calls after success
+        window.onTurnstileSuccess = function (token) {
+            if (isMounted) {
+                onVerified(token);
+            }
+        };
+
+        const initTurnstile = () => {
+            if (window.turnstile && containerRef.current && !widgetIdRef.current) {
+                try {
+                    widgetIdRef.current = window.turnstile.render(containerRef.current, {
+                        sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x00000000000000000000AA",
+                        callback: "onTurnstileSuccess",
+                        theme: "dark",
+                    });
+                } catch (err) {
+                    console.error("Turnstile render error:", err);
+                }
+            }
+        };
+
         // Load Turnstile script once
         if (!document.getElementById("cf-turnstile-script")) {
             const script = document.createElement("script");
             script.id = "cf-turnstile-script";
-            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback";
             script.async = true;
             script.defer = true;
+            
+            window.onloadTurnstileCallback = () => {
+                if (isMounted) initTurnstile();
+            };
+            
             document.body.appendChild(script);
+        } else {
+            // Script already loaded, wait for turnstile global to be available
+            if (window.turnstile) {
+                initTurnstile();
+            } else {
+                const checkInterval = setInterval(() => {
+                    if (window.turnstile) {
+                        clearInterval(checkInterval);
+                        if (isMounted) initTurnstile();
+                    }
+                }, 100);
+                return () => {
+                    clearInterval(checkInterval);
+                    isMounted = false;
+                };
+            }
         }
 
-        // Callback Cloudflare calls after success
-        window.onTurnstileSuccess = function (token) {
-            onVerified(token);
+        return () => {
+            isMounted = false;
+            // Clean up the widget on unmount to avoid warnings
+            if (widgetIdRef.current && window.turnstile) {
+                try {
+                    window.turnstile.remove(widgetIdRef.current);
+                    widgetIdRef.current = null;
+                } catch (e) {
+                    console.warn("Error removing turnstile widget:", e);
+                }
+            }
         };
     }, [onVerified]);
 
@@ -34,12 +88,7 @@ export default function CaptchaGate({ onVerified }) {
                     </div>
 
                     <div className="flex justify-start mb-16 min-h-[65px]">
-                        <div
-                            className="cf-turnstile"
-                            data-sitekey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                            data-callback="onTurnstileSuccess"
-                            data-theme="dark"
-                        ></div>
+                        <div ref={containerRef}></div>
                     </div>
 
                     <div className="text-[14px] md:text-[15px] text-[#6b7280] space-y-6 border-t border-white/5 pt-12">
