@@ -33,11 +33,11 @@ export default function CaptchaGate({ onVerified }) {
         if (!document.getElementById("cf-turnstile-script")) {
             const script = document.createElement("script");
             script.id = "cf-turnstile-script";
-            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback";
+            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
             script.async = true;
             script.defer = true;
             
-            window.onloadTurnstileCallback = () => {
+            script.onload = () => {
                 if (isMounted) initTurnstile();
             };
             
