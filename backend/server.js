@@ -320,8 +320,8 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.cloudiverse.app", "https://checkout.razorpay.com", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://cdn-cgi.cloudflare.com"],
-      connectSrc: ["'self'", "https://www.cloudiverse.app", "https://api.cloudiverse.app", "https://lumberjack.razorpay.com", "https://checkout.razorpay.com", "https://www.google-analytics.com", "https://stats.g.doubleclick.net"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://d24wvz9oaqi0mr.cloudfront.net", "https://checkout.razorpay.com", "https://www.googletagmanager.com", "https://www.google-analytics.com", "https://cdn-cgi.cloudflare.com"],
+      connectSrc: ["'self'", "https://d24wvz9oaqi0mr.cloudfront.net", "https://api.cloudiverse.app", "https://lumberjack.razorpay.com", "https://checkout.razorpay.com", "https://www.google-analytics.com", "https://stats.g.doubleclick.net"],
       frameSrc: ["'self'", "https://checkout.razorpay.com"],
       imgSrc: ["'self'", "data:", "https:"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://checkout.razorpay.com"],
@@ -338,7 +338,7 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'https://www.cloudiverse.app',
+  'https://d24wvz9oaqi0mr.cloudfront.net',
   'https://cloudiverse.app'
 ];
 
@@ -364,11 +364,11 @@ app.use(cors({
   origin: function (origin, callback) {
     // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    const isAllowed = allowedOrigins.includes(origin) || 
-                      origin.endsWith('.cloudfront.net') ||
-                      /^https:\/\/[a-z0-9-]+\.cloudfront\.net$/.test(origin);
-                      
+
+    const isAllowed = allowedOrigins.includes(origin) ||
+      origin.endsWith('.cloudfront.net') ||
+      /^https:\/\/[a-z0-9-]+\.cloudfront\.net$/.test(origin);
+
     if (isAllowed) {
       callback(null, true);
     } else {

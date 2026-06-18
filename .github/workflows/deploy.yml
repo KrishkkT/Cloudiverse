@@ -77,7 +77,7 @@ jobs:
       - name: Build Frontend
         working-directory: ./frontend
         env:
-          VITE_API_BASE_URL: https://d23p8u9odionwl.cloudfront.net
+          VITE_API_BASE_URL: https://d24wvz9oaqi0mr.cloudfront.net
           VITE_TURNSTILE_SITE_KEY: 1x00000000000000000000AA # Replace in GitHub secrets if different
           VITE_GOOGLE_CLIENT_ID: 788671667486-ndqdio7n6euv09bglrsm5h9v2ri6lbgu.apps.googleusercontent.com
         run: npm run build
@@ -97,5 +97,5 @@ jobs:
       - name: Invalidate CloudFront Cache
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id E1YMQWMFOZXK8B \
+            --distribution-id E2YJP0W4T5MK21 \
             --paths "/*"
