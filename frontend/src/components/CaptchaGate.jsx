@@ -21,7 +21,7 @@ export default function CaptchaGate({ onVerified }) {
                 try {
                     widgetIdRef.current = window.turnstile.render(containerRef.current, {
                         sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x00000000000000000000AA",
-                        callback: "onTurnstileSuccess",
+                        callback: window.onTurnstileSuccess,
                         theme: "dark",
                     });
                 } catch (err) {
