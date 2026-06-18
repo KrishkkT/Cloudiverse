@@ -7,6 +7,7 @@ export default function CaptchaGate({ onVerified }) {
 
     useEffect(() => {
         let isMounted = true;
+        let checkInterval = null;
 
         // Callback Cloudflare calls after success
         window.onTurnstileSuccess = function (token) {
@@ -29,39 +30,23 @@ export default function CaptchaGate({ onVerified }) {
             }
         };
 
-        // Load Turnstile script once
-        if (!document.getElementById("cf-turnstile-script")) {
-            const script = document.createElement("script");
-            script.id = "cf-turnstile-script";
-            script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-            script.async = true;
-            script.defer = true;
-            
-            script.onload = () => {
-                if (isMounted) initTurnstile();
-            };
-            
-            document.body.appendChild(script);
+        if (window.turnstile) {
+            initTurnstile();
         } else {
-            // Script already loaded, wait for turnstile global to be available
-            if (window.turnstile) {
-                initTurnstile();
-            } else {
-                const checkInterval = setInterval(() => {
-                    if (window.turnstile) {
-                        clearInterval(checkInterval);
-                        if (isMounted) initTurnstile();
-                    }
-                }, 100);
-                return () => {
+            // Script is loaded in index.html, poll until the global is ready
+            checkInterval = setInterval(() => {
+                if (window.turnstile) {
                     clearInterval(checkInterval);
-                    isMounted = false;
-                };
-            }
+                    if (isMounted) initTurnstile();
+                }
+            }, 100);
         }
 
         return () => {
             isMounted = false;
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
             // Clean up the widget on unmount to avoid warnings
             if (widgetIdRef.current && window.turnstile) {
                 try {
